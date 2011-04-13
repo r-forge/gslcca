@@ -1,0 +1,9 @@
+Package: testESLCCA
+Type: Package
+Title: Extended Semi-Linear Canonical Correlation Analysis
+Version: 1.0
+Date: 2011-04-04
+Author: Foteini Strimenopoulou, Phil Brain and Heather Turner
+Maintainer: Foteini Strimenopoulou <Foteini.Strimenopoulou@pfizer.com>
+Description: This is a package for Extended Semi-linear Canonical Correlation Analysis (ESLCCA, described in Brain et al, 2011).  ESLCCA estimates the parameters of a given nonlinear pharmaocometric  model to maximize the correlation with a linear combination of the multiple response variables (in this case, the power spectra). This method can be used to characterize brain activity under different treatment regimens in research and development projects at Pfizer.
+License: What license is it under?
