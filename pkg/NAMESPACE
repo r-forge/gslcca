@@ -1,2 +1,13 @@
 export(ESLCCA)
 
+importFrom(reshape, cast)
+importFrom(lattice, xyplot) #other lattice functions necessary?
+
+S3method(formula, ESLCCA)
+S3method(coef, ESLCCA)
+S3method(plot, ESLCCA)
+S3method(print, ESLCCA)
+S3method(summary, ESLCCA)
+
+
+

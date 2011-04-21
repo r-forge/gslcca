@@ -12,7 +12,7 @@ if (sum(is.na(as.numeric(f)))>0) {f=1:length(f)} else {f=as.numeric(f)}
 Y=as.matrix(DATA[,-c(1:3)])
 # Pre-smoothing of the complete data set for artifacts removal
 if (PreSmoothingRoots!=0) {
-    if  (PreSmoothinRoots==-1) {
+    if  (PreSmoothingRoots==-1) {
          Ytemp= scale(Y,scale=F)
          eig=cbind(eigen(t(Ytemp)%*%Ytemp)$values)
          nroots=1:length(eig)
@@ -128,9 +128,9 @@ for (i in 1:nind) {
      }
      RYr=R%*%Yr
      # Reduce the dimensionality using svd
-     rank_RFr=qr(RYr)$rank
-     SVD = svd( RYr, nu=rank_RFr, nv=rank_RFr )
-     D<-diag(SVD$d[1:rank_RFr])
+     rank_RYr=qr(RYr)$rank
+     SVD = svd( RYr, nu=rank_RYr, nv=rank_RYr )
+     D<-diag(SVD$d[1:rank_RYr])
      U1<-SVD$u
      V<-SVD$v
      RYr=U1%*%D
@@ -145,7 +145,7 @@ for (i in 1:nind) {
      S11.eig <- eigen(S11)
      S11.val=suppressWarnings(sqrt(S11.eig$values))
      S11.val[is.na(S11.val)]=0
-     S11.sqrt <- ginv(S11.eig$vectors %*% diag(S11.val) %*% t(S11.eig$vectors))
+     S11.sqrt <- solve(S11.eig$vectors %*% diag(S11.val) %*% t(S11.eig$vectors))
      nPar=length(initial.K)/length(size())  # computes the number of parameters in 'Curve'
      temp1=rep(size(),nPar)
      obj.f=function(Kvector) {
@@ -160,9 +160,9 @@ for (i in 1:nind) {
      S22.inv.S21=ginv(t(RFr)%*%RFr)%*%t(S12)
      Eigvectors=eigen(S11.sqrt%*%S12%*%S22.inv.S21%*%S11.sqrt)$vectors
      optEigvalue=Eigvectors[,root]
-     Gamma[i,]= V%*%S11.sqrt%*%optEigvalue
+     Gamma[i,]= Re(V%*%S11.sqrt%*%optEigvalue)
      Gamma= Gamma
-     Theta= S22.inv.S21%*%Eigvectors
+     Theta= Re(S22.inv.S21%*%Eigvectors)
      RFrTheta=RFr%*%Theta
      Norm=apply(RFrTheta^2,2,sum)
      Theta=Theta/sqrt(matrix(Norm,nrow(Theta),ncol=ncol(Theta),byrow=T))
@@ -170,17 +170,9 @@ for (i in 1:nind) {
      hRFrTheta=RFrTheta[-c(1:(length(t)+10))]
      cond=hRFrTheta[abs(hRFrTheta)==max(abs(hRFrTheta))]
      if   (cond[1]<0) {Gamma[i,]=-Gamma[i,]; RFrTheta=-RFrTheta}
-     par(mfrow=c(2,1),cex=0.8)
-     plot(f,Gamma[i,],xlab='Frequency',ylab='Signature',type='l')
-     title(paste('Signature for subject',levels(Subject)[i]))
      Fit_values=RYr%*%t(V)%*%Gamma[i,]
      Fitted_values=c(Fitted_values,Fit_values)
      observed_val=c(observed_val,RFrTheta)
-     plot(c(tv,t),RFrTheta,ylim=range(c(RFrTheta,Fit_values)),pch='*',xlab='Time',ylab='Fitted values',col=rep(1:(length(Treat_c)+1),c(nv,n_vec)))
-     points(c(tv,t),Fit_values,pch='.',col=rep(1:(length(Treat_c)+1),c(nv,n_vec)))
-     title(paste('Fitted values for subject',levels(Subject)[i]))
-     legend(x="topright",y=NULL, c('Control',Treat_c), col =1:(length(Treat_c)+1), text.col = "green4", lty = 1, pch = NULL, merge = TRUE)
-
      Theta_1=cbind(Theta_1,Theta[,1])
      f_min=c(f_min,Re(obj.f(nlPAR[i,])))
      RYr_list[[i]]=RYr%*%t(V)
@@ -202,15 +194,6 @@ sl_ind= l_ind[sign_sign==F]
      observed_val[Subject_ind %in% sl_ind] = - observed_val[Subject_ind %in% sl_ind]
      Fitted_values[Subject_ind %in% sl_ind] = - Fitted_values[Subject_ind %in% sl_ind]
 }
-
-par(mfrow=c(1,1),cex=0.8)
-matplot(f,t(Gamma),col=1:nind,type='l',xlab='Frequency',ylab='Signature')
-title('Signatures corresponding to different subjects')
-legend(x="topright",y=NULL, paste('Subject',levels(Subject)), col =1:nind, text.col = "green4", lty = 1:nind, pch = NULL, merge = TRUE)
-
-plot(apply(Gamma,2,mean),xlab='Frequency',type='l')
-title('Mean Signature' )
-
 
 Sign=t(Gamma)
 Sign2=cbind(f,Sign)
@@ -237,26 +220,15 @@ colnames(nlPAR)=paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)))
 colnames(PAR_K)=c(c(colnames(nlPAR)),'Func_min','EigValue')
 write.table(t(PAR_K), file=paste(path,"Nonlinear Parameters when SeparatePar=",separate,comp_name,".txt"), sep="\t", col.names = NA)
 
-Output_Data=data.frame(Subject_ind,Time_ind,Treat_ind,Fitted_values,observed_val)
-
-# Calculate the mean fitted curves
-data=Output_Data[c(1:3,5)]
-time_treat=paste(data[,2],data[,3])
-Subject_ind=as.numeric(data$Subject_ind)
-observed_val=as.numeric(data$observed_val)
-data=data.frame(time_treat,Subject_ind,observed_val)
-wide <- reshape(data, v.names="observed_val", idvar="time_treat",timevar="Subject_ind", direction="wide")
-D=matrix(as.numeric(as.matrix(wide)),nrow=nrow(wide),ncol=ncol(wide))
-Time=as.numeric(levels(as.factor(Output_Data$Time_ind)))
-# Plot the mean fitted curves
-plot(rep(Time,length(Treat_c)+1),apply(D,1,mean,na.rm=TRUE),col=rep(1:(length(Treat_c)+1),rep(length(Time),length(Treat_c)+1)),xlab='Time',ylab='Fitted values')
-title('Mean fitted curves')
-legend(x="topright",y=NULL, c('Control',Treat_c), col =1:(length(Treat_c)+1), text.col = "green4", lty = 1, pch = NULL, merge = TRUE)
-
+Output_Data=data.frame(Subject_ind,Time_ind,Treat_ind, observed_val)
 
 dev.off()
 rownames(Gamma)=levels(Subject)
-list(frequencies=col.name[-c(1:3)],Signature=Gamma,fit_obs=Output_Data ,NonLinearPars=nlPAR,RYr=RYr_list,RFr=RFr_list)
-
+out <- list(frequencies=f,signatures=Gamma, fitted.values = observed_val,
+            y = Fitted_values, # observed_val & Fitted_values currently defined opposite way from what you'd expect!
+            subject = as.factor(Subject_ind), time = Time_ind, treatment = as.factor(Treat_ind),
+            NonLinearPars=nlPAR,RYr=RYr_list,RFr=RFr_list)
+class(out) <- "ESLCCA"
+out
 }
 
