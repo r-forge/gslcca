@@ -1,5 +1,6 @@
 `ESLCCA` <-
-function (DATA,Curve='DoubleExponential',PreSmoothingRoots=0,r=-1,con=0,separate=T,path='c:\\',comp_name,initial.K=NULL) {
+function (DATA,Curve='DoubleExponential',PreSmoothingRoots=0,r=-1,con=0,separate=T,path='c:\\',comp_name,initial.K=NULL,
+          ref = 1) {
 
 # Upload required R libraries
 library(MASS)
@@ -223,11 +224,24 @@ write.table(t(PAR_K), file=paste(path,"Nonlinear Parameters when SeparatePar=",s
 Output_Data=data.frame(Subject_ind,Time_ind,Treat_ind, observed_val)
 
 dev.off()
+ycoef <- as.data.frame(Gamma)
+colnames(ycoef) <- f
+
 rownames(Gamma)=levels(Subject)
-out <- list(frequencies=f,signatures=Gamma, fitted.values = observed_val,
-            y = Fitted_values, # observed_val & Fitted_values currently defined opposite way from what you'd expect!
-            subject = as.factor(Subject_ind), time = Time_ind, treatment = as.factor(Treat_ind),
-            NonLinearPars=nlPAR,RYr=RYr_list,RFr=RFr_list)
+out <- list(call = match.call(),
+            ycoef = ycoef, # 'signatures' rownames = freq, colnames = subject
+            xcoef = NULL, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
+            scores = data.frame(subject = as.factor(Subject_ind),
+                                treatment = as.factor(Treat_ind),# could be NULL?
+                                time = Time_ind,
+                                xscores = observed_val,
+                                yscores = Fitted_values),
+            ref = ref, # reference level, not implemented yet (could be NULL?)
+            nonlinear.parameters = as.data.frame(nlPAR),
+            y = RYr_list,
+            x = RFr_list,
+            global.roots = PreSmoothingRoots,
+            subject.roots = r) # x should be cbind(RFr, G)
 class(out) <- "ESLCCA"
 out
 }
