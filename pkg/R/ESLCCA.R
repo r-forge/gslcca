@@ -1,11 +1,12 @@
-ESLCCA <- function (Y, # matrix of power spectra
+            ESLCCA <- function (Y, # matrix of power spectra
                     time, # time points
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
                     treatment = NULL, # treatment factor (allow NULL => single curve?)
                     ref = 1, # reference level (allow NULL => no control?)
                     na.action,
                     Curve = 'DoubleExponential', # use built-in for now, implement formula later
-                    PreSmoothingRoots=0,r=-1,con=0,separate=T,path='c:\\',comp_name,
+                    data.roots=0,subject.roots=-1,con=TRUE,
+                    separate=TRUE,
                     start = NULL,
                     ...) { # allow arguments to be passed to optim
 
@@ -38,23 +39,23 @@ id <- unclass(factor(treatment[include]))
 subject <- as.factor(subject)
 
 # Pre-smoothing of the complete data set for artifacts removal
-if (PreSmoothingRoots!=0) {
-    if  (PreSmoothingRoots==-1) {
+if (data.roots!=0) {
+    if  (data.roots==-1) {
          Ytemp= scale(Y,scale=F)
-         eig=cbind(eigen(t(Ytemp)%*%Ytemp)$values)
+         eig=cbind(eigen(crossprod(Ytemp))$values)
          nroots=1:length(eig)
-         PreSmoothingRoots=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
+         data.roots=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
     }
-    SVD = svd( Y, nu=PreSmoothingRoots, nv=PreSmoothingRoots )
-    Y = SVD$u%*%diag(SVD$d[1:PreSmoothingRoots])%*%t(SVD$v)
+    SVD = svd( Y, nu=data.roots, nv=data.roots )
+    Y = SVD$u%*%diag(SVD$d[1:data.roots],ncol=data.roots)%*%t(SVD$v)
 }
 
 Y=Y-apply(Y,1,min)
 nind=nlevels(subject)
 ntreat=nlevels(treatment)
 Gamma=matrix(nrow=nind,ncol=length(f))
-Fitted_values=treatment_ind=time_ind= c()
-if (separate==T) {
+observed.val = c()
+if (separate==TRUE) {
     nvar=ntreat-1
     size = function() {n_vec}
 } else {
@@ -62,21 +63,21 @@ if (separate==T) {
     size = function() {nr-nv}
 }
 
-if (r<=0) {
-    if (r==0) {
+if (subject.roots<=0) {
+    if (subject.roots==0) {
         # No smoothing case, so r will be equal to the rank of the data matrix
-        r=min(c(min(table(subject)),length(f)))
+        subject.roots = min(c(min(table(subject)),length(f)))
     } else {
         # Default smoothing
-        r=c()
-        eig=c()
+        subject.roots = c()
+        eig = c()
         for (i in 1:nind) {
-             Ytemp= scale(Y[subject==levels(subject)[i],],scale=F)
-             eig=cbind(eigen(t(Ytemp)%*%Ytemp)$values)
-             nroots=1:length(eig)
-             r=c(r,max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]))
+             Ytemp = scale(Y[subject==levels(subject)[i],],scale=F)
+             eig = cbind(eigen(crossprod(Ytemp))$values)
+             nroots = 1:length(eig)
+             subject.roots = c(subject.roots,max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]))
         }
-        r=max(r)+1
+        subject.roots = max(subject.roots)+1
     }
 }
 
@@ -103,54 +104,73 @@ group <- gl(nPar, nvar, labels = names(start))
 
 if (!is.expression(Curve)) {
     if (Curve == 'DoubleExponential') {
-        Curve <- expression(exp(-time/exp(K1))-exp(-time/exp(K2)))
+        Curve <- expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) + (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) )
     }
     else if (Curve == 'CriticalExponential') {
         Curve <- expression(time*exp(-time/exp(K1)))
     }
 }
 
-root=1
+CCA.roots = 1
 
-nlPAR=matrix(nrow=nind,ncol=length(unlist(start)))
+nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
 
-Theta_1=c()
-f_min=c()
-RYr_list=list()
-RFr_list=list()
+Theta.m=c()
+linear.par = C = G = c()
+f.min=c()
+y.list=list()
+x.list=list()
 opt <- list()
 
 corr_mat=matrix(ncol=nind,nrow=nlevels(treatment))
-observed_val=c()
+fitted.val=c()
+
+if (!is.numeric(con)) {
+      if (con==TRUE) {
+          case = 1
+      } else {
+          case = 2
+      }
+  } else {
+      case = 3
+}
+
 for (i in 1:nind) {
      # Do PCA on Y
      Indsubject = subject==levels(subject)[i]
      Yr = Y[Indsubject,]
      nr=nrow(Yr)
-     SVD = svd( Yr, nu=r, nv=r )
-     Yr = SVD$u%*%diag(SVD$d[1:r])%*%t(SVD$v)
+     SVD = svd( Yr, nu=subject.roots, nv=subject.roots )
+     Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.roots]),y=SVD$v)
      # Calculate the idempotent matrix R
      I = rep(1,nr)
-     if (con==0) {
-         R = diag(I)-I%*%solve(t(I)%*%I)%*%t(I)
+     if (!is.numeric(con)) {
+         if (case==1) {
+             G=I
+             R = diag(nr) - matrix(1/nr, nr, nr)
+         } else {
+             R = diag(I)
+         }
      } else {
-         R = diag(I)
+         G=con[Indsubject,]
+         R = diag(I)-G%*%solve(crossprod(G))%*%t(G)
      }
      RYr=R%*%Yr
      # Reduce the dimensionality using svd
-     rank_RYr=qr(RYr)$rank
-     SVD = svd( RYr, nu=rank_RYr, nv=rank_RYr )
-     D<-diag(SVD$d[1:rank_RYr])
+     rank.RYr=qr(RYr)$rank
+     SVD = svd( RYr, nu=rank.RYr, nv=rank.RYr )
+     D<-diag(SVD$d[1:rank.RYr],ncol=rank.RYr)
      U1<-SVD$u
      V<-SVD$v
      RYr=U1%*%D
-     S11=t(RYr)%*%RYr
+     S11=crossprod(RYr)
      S11.eig <- eigen(S11)
      S11.val=suppressWarnings(sqrt(S11.eig$values))
      S11.val[is.na(S11.val)]=0
-     S11.sqrt <- solve(S11.eig$vectors %*% diag(S11.val) %*% t(S11.eig$vectors))
+     S11.sqrt <- solve(S11.eig$vectors %*% tcrossprod(diag(S11.val,ncol=length(S11.val)),S11.eig$vectors) )
      include <-  treatment[Indsubject] != ref #can ignore reference level when finding nonlin par
      id <- unclass(factor(treatment[Indsubject][include]))
+     R2=R
      R <- R[,include]
      dat <- data.frame(time = time[Indsubject][include])
      nm <- names(start)
@@ -162,36 +182,41 @@ for (i in 1:nind) {
          val <- eval(Curve, dat)
          RFr <- R %*% (val*F)
          C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
-         z <- backsolve(C, t(RFr) %*% RYr %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
+         z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
          log(1-eigen(crossprod(z), symmetric = TRUE, only.values = TRUE)$values[1])
      }
      # Minimize ln(1-largesteigenvalue(Corr))
      opt[[i]] <- optim(unlist(start), obj.f, ...)
-     nlPAR[i,]=opt[[i]]$par
-     par <- split(nlPAR[i,], group)
+     nonlin.par[i,]=opt[[i]]$par
+     par <- split(nonlin.par[i,], group)
      dat[nm] <- lapply(par, "[", id)
      val <- eval(Curve, dat)
-     RFr <- R %*% (val*F)
+     Fr <- val*F
+     RFr <- R %*% Fr
      S21 <- t(RFr) %*% RYr
-     S22.inv.S21 <- ginv(crossprod(RFr)) %*% S21
+     S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
      Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
-     optEigvalue=Eigvectors[,root]
+     optEigvalue=Eigvectors[,CCA.roots]
      Gamma[i,]= Re(V%*%S11.sqrt%*%optEigvalue)
      Theta= Re(S22.inv.S21%*%Eigvectors)
      RFrTheta=RFr%*%Theta
      Norm <- colSums(RFrTheta^2)
      Theta=Theta/sqrt(matrix(Norm,nrow(Theta),ncol=ncol(Theta),byrow=T))
-     RFrTheta=RFr%*%Theta[,root]
+     RFrTheta=RFr%*%Theta[,CCA.roots]
      hRFrTheta <- RFrTheta[include][-(1:10)]
      cond=hRFrTheta[abs(hRFrTheta)==max(abs(hRFrTheta))]
-     if   (cond[1]<0) {Gamma[i,]=-Gamma[i,]; RFrTheta=-RFrTheta}
-     RYr_list[[i]]=RYr%*%t(V)
-     Fit_values=RYr_list[[i]]%*%Gamma[i,]
-     Fitted_values=c(Fitted_values,Fit_values)
-     observed_val=c(observed_val,RFrTheta)
-     Theta_1=cbind(Theta_1,Theta[,1])
-     f_min=c(f_min,Re(opt[[i]]$value))
-     RFr_list[[i]]=RFr
+    # if   (cond[1]<0) {Gamma[i,]=-Gamma[i,]; RFrTheta=-RFrTheta}
+     y.list[[i]]=tcrossprod(RYr,V)
+     observed.val=c( observed.val, y.list[[i]]%*%Gamma[i,] )
+     fitted.val=c(fitted.val,RFrTheta)
+     Theta.m=cbind(Theta.m,Theta[,1])
+     f.min=c(f.min,Re(opt[[i]]$value))
+     x.list[[i]]=cbind(RFr,G)
+     # Save intercept and covariates linear parameters.
+     Y.tilde=ginv(R2)%*%Yr%*%as.matrix(Gamma[i,])
+     F.tilde=c(rep(0,sum(include==0)),Fr%*%Theta[,1])
+     if (case != 2) { C=solve(crossprod(G))%*%t(G)%*%(Y.tilde-F.tilde) }
+     linear.par=cbind(linear.par,C)
 }
 
 l_ind=levels(subject)
@@ -201,59 +226,53 @@ sign_sign= loading>0
 sl_ind=l_ind[sign_sign]
 if (sum(sign_sign)<=sum(sign_sign==F)) {
      Gamma[sign_sign,]=-Gamma[sign_sign,]
-     observed_val[subject %in% sl_ind] = - observed_val[subject %in% sl_ind]
-     Fitted_values[subject %in% sl_ind] = - Fitted_values[subject %in% sl_ind]
+     fitted.val[subject %in% sl_ind] = - fitted.val[subject %in% sl_ind]
+     observed.val[subject %in% sl_ind] = - observed.val[subject %in% sl_ind]
 }  else {
 sl_ind= l_ind[sign_sign==F]
      Gamma[sign_sign==F,]=-Gamma[sign_sign==F,]
-     observed_val[subject %in% sl_ind] = - observed_val[subject %in% sl_ind]
-     Fitted_values[subject %in% sl_ind] = - Fitted_values[subject %in% sl_ind]
+     fitted.val[subject %in% sl_ind] = - fitted.val[subject %in% sl_ind]
+     observed.val[subject %in% sl_ind] = - observed.val[subject %in% sl_ind]
 }
-
-Sign=t(Gamma)
-Sign2=cbind(f,Sign)
-colnames(Sign2)=c('Freq',as.character(paste('subject',levels(subject))))
-Sign2=as.data.frame(Sign2)
-save(Sign2,file=paste(path,'Signatures when SeparatePar=',separate,'.RDA'))
-rownames(Sign)=as.character(paste('f',f))
-colnames(Sign)=as.character(paste('subject',levels(subject)))
-write.table(Sign, file=paste(path,"Signatures when SeparatePar=",separate,".txt"), sep="\t", col.names = NA)
 
 treatment_c <- setdiff(levels(treatment), ref)
-colnames(Theta_1)=as.character(paste('subject',levels(subject)))
-rownames(Theta_1)=treatment_c
-write.table(Theta_1, file=paste(path,"Linear Parameters when SeparatePar=",separate,".txt"), sep="\t", col.names = NA)
-
-f_min=matrix(f_min,ncol=1)
-PAR_K=cbind(nlPAR,f_min,1-exp(f_min))
-rownames(PAR_K)=rownames(nlPAR)=as.character(paste('subject',levels(subject)))
+rownames(nonlin.par)=as.character(paste('subject',levels(subject)))
 if (separate==T) {
-colnames(nlPAR)= paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)),rep(treatment_c,nPar))
+colnames(nonlin.par)= paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)),rep(treatment_c,nPar))
 } else {
-colnames(nlPAR)=paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)))
+colnames(nonlin.par)=paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)))
 }
-colnames(PAR_K)=c(c(colnames(nlPAR)),'Func_min','EigValue')
-write.table(t(PAR_K), file=paste(path,"Nonlinear Parameters when SeparatePar=",separate,comp_name,".txt"), sep="\t", col.names = NA)
+
+if (case != 1) {
+    rownames(linear.par) = colnames(con)
+} else {
+    rownames(linear.par) = 'Intercept'
+}
+colnames(Theta.m)=as.character(paste('subject',levels(subject)))
+rownames(Theta.m)=treatment_c
+xcoef = rbind(Theta.m, linear.par)
 
 ycoef <- as.data.frame(Gamma)
-colnames(ycoef) <-f
+colnames(ycoef) <- f
 rownames(ycoef) <- levels(subject)
 
-rownames(Gamma)=levels(subject)
+R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(rownames(nonlin.par),'R^2')))
+
 out <- list(call = match.call(),
             ycoef = ycoef, # 'signatures' rownames = subject, colnames = freq
-            xcoef = NULL, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
+            xcoef = xcoef, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
             scores = data.frame(subject = subject,
                                 treatment = treatment,# could be NULL?
                                 time = time,
-                                xscores = observed_val,
-                                yscores = Fitted_values),
+                                xscores = fitted.val,
+                                yscores = observed.val),
             ref = ref, # reference level, not implemented yet (could be NULL?)
-            nonlinear.parameters = as.data.frame(nlPAR),
-            y = RYr_list,
-            x = RFr_list, # x should be cbind(RFr, G)
-            global.roots = PreSmoothingRoots,
-            subject.roots = r,
+            nonlinear.parameters = as.data.frame(nonlin.par),
+            R.square = R.square,
+            y = y.list,
+            x = x.list,
+            global.roots = data.roots,
+            subject.roots = subject.roots,
             opt = opt)
 class(out) <- "ESLCCA"
 out
