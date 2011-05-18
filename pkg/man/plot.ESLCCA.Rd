@@ -1,4 +1,98 @@
-plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALSE,
+\name{plot.ESLCCA}
+\alias{plot.ESLCCA}
+\title{
+  Plot Results from an ESLCCA Analysis}
+}
+\description{
+  Plot \dQuote{signatures} (loadings of the Y matrix) or (projected)
+  observed and fitted values (Y and X scores) from an \dQuote{ESLCCA} object.
+}
+\usage{
+    plot.ESLCCA(x, type = "signature", individual = TRUE,
+        overlay = FALSE, ask = dev.interactive(), lattice = FALSE,
+        main = NULL, xlab = NULL, ylab = NULL, col = NULL, lty = NULL,
+        pch = NULL, legend.x = "topright", space = "bottom",
+        corner = NULL, columns = 2, ...)
+}
+\arguments{
+  \item{x}{ an object of class \code{"ESLCCA"}. }
+  \item{type}{ the type of plot: either \code{"signature"} or \code{"fitted"}. }
+  \item{individual}{ logical: if \code{TRUE} values are plotted for
+    each level of \code{x$subject} individually, otherwise values are
+    averaged over subjects.  }
+  \item{overlay}{ logical:  if \code{TRUE} the values for each subject
+    are overlaid on the same plot, otherwise a separate plot is
+    produced for each subject. Ignored when \code{individual} is \code{FALSE}.}
+  \item{ask}{ logical: if \code{TRUE}, the user is \emph{ask}ed before each plot, see
+    \code{\link{par}(ask=.)}. Ignored when only one plot is produced. }
+  \item{lattice}{ logical: if \code{TRUE} the values for each subject
+    are displayed in separate panels of a trellis plot. }
+  \item{main}{
+%%     ~~Describe \code{main} here~~
+}
+  \item{xlab}{
+%%     ~~Describe \code{xlab} here~~
+}
+  \item{ylab}{
+%%     ~~Describe \code{ylab} here~~
+}
+  \item{col}{
+%%     ~~Describe \code{col} here~~
+}
+  \item{lty}{
+%%     ~~Describe \code{lty} here~~
+}
+  \item{pch}{
+%%     ~~Describe \code{pch} here~~
+}
+  \item{legend.x}{
+%%     ~~Describe \code{legend.x} here~~
+}
+  \item{space}{
+%%     ~~Describe \code{space} here~~
+}
+  \item{corner}{
+%%     ~~Describe \code{corner} here~~
+}
+  \item{columns}{
+%%     ~~Describe \code{columns} here~~
+}
+  \item{\dots}{
+%%     ~~Describe \code{\dots} here~~
+}
+}
+\details{
+%%  ~~ If necessary, more details than the description above ~~
+}
+\value{
+%%  ~Describe the value returned
+%%  If it is a LIST, use
+%%  \item{comp1 }{Description of 'comp1'}
+%%  \item{comp2 }{Description of 'comp2'}
+%% ...
+}
+\references{
+%% ~put references to the literature/web site here ~
+}
+\author{
+%%  ~~who you are~~
+}
+\note{
+%%  ~~further notes~~
+}
+
+%% ~Make other sections like Warning with \section{Warning }{....} ~
+
+\seealso{
+%% ~~objects to See Also as \code{\link{help}}, ~~~
+}
+\examples{
+##---- Should be DIRECTLY executable !! ----
+##-- ==>  Define data, use random,
+##--	or do  help(data=index)  for the standard data sets.
+
+## The function is currently defined as
+function(x, type = "signature", individual = TRUE, overlay = FALSE,
                         ask = dev.interactive(), lattice = FALSE,
                         main = NULL, xlab = NULL, ylab = NULL,
                         col = NULL, lty = NULL, pch = NULL, legend.x = "topright",
@@ -69,7 +163,7 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
                 layout <- trellis.currentLayout()
                 nc <- ncol(layout)
                 for (i in seq_len(ns)) {
-                    trellis.focus("panel", column = (i - 1) %% nc + 1, row = (i - 1) %/% nc + 1)
+                    trellis.focus("panel", column = (i - 1) \%\% nc + 1, row = (i - 1) \%/\% nc + 1)
                     with(x$scores, {
                         id <- subject == ls[i]
                         panel.points(time[id], yscores[id], col = col[treatment[id]], pch = pch[treatment[id]], cex = 0.6)
@@ -113,4 +207,9 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
                    pch = NULL, merge = TRUE)
        }
     }
+  }
 }
+% Add one or more standard keywords, see file 'KEYWORDS' in the
+% R documentation directory.
+\keyword{ ~kwd1 }
+\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line

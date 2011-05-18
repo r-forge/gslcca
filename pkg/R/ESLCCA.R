@@ -1,10 +1,10 @@
-            ESLCCA <- function (Y, # matrix of power spectra
+ESLCCA <- function (Y, # matrix of power spectra
                     time, # time points
+                    formula = 'DoubleExponential', # use built-in for now, implement formula later
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
                     treatment = NULL, # treatment factor (allow NULL => single curve?)
                     ref = 1, # reference level (allow NULL => no control?)
                     na.action,
-                    Curve = 'DoubleExponential', # use built-in for now, implement formula later
                     data.roots=0,subject.roots=-1,con=TRUE,
                     separate=TRUE,
                     start = NULL,
@@ -84,33 +84,32 @@ if (subject.roots<=0) {
 # In the case that the curve is not specified by the user, then the default is
 # the double exponential (with positive rate parameters) and the default initial
 # values are following
+if (is.character(formula)) {
+    start <- switch(formula,
+                    "DoubleExponential" = list(K1 = rep(8.5, nvar), K2 = rep(9, nvar)),
+                    "CriticalExponential" = list(K1 = rep(8.5, nvar)))
+}
+
 if (is.null(start)) {
-    if (!is.expression(Curve)) {
-        if (Curve == 'DoubleExponential') start <- list(K1 = rep(8.5, nvar), K2 = rep(9, nvar))
-        if (Curve == 'CriticalExponential') start <- list(K1 = rep(8.5, nvar))
-    }else{
-        stop('No initial values have been specified for the nonlinear parameters.')
-    }
+    stop('No initial values have been specified for the nonlinear parameters.')
 }
 else {
     start <- mapply(function(start, label, nvar) {
         if (length(start) == 1) rep(start, nvar)
         else if (length(start) == nvar) start
         else stop("there should be 1 or", nvar, "starting values for parameter", label, "\n")
-    }, start = start, label = names(start), MoreArgs = list(nvar = nvar))
+    }, start = start, label = names(start), MoreArgs = list(nvar = nvar), SIMPLIFY = FALSE)
 }
 nPar <- length(start)
 group <- gl(nPar, nvar, labels = names(start))
 
-if (!is.expression(Curve)) {
-    if (Curve == 'DoubleExponential') {
-        Curve <- expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) + (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) )
-    }
-    else if (Curve == 'CriticalExponential') {
-        Curve <- expression(time*exp(-time/exp(K1)))
-    }
+if (is.character(formula)) {
+    formula <- switch(formula,
+                      "DoubleExponential" = expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
+                          (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) ),
+                      "CriticalExponential" = expression(time*exp(-time/exp(K1))))
 }
-
+else formula <- as.expression(formula[[length(formula)]])
 CCA.roots = 1
 
 nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
@@ -179,7 +178,7 @@ for (i in 1:nind) {
      obj.f=function(Kvector) {
          par <- split(Kvector, group)
          dat[nm] <- lapply(par, "[", id)
-         val <- eval(Curve, dat)
+         val <- eval(formula, dat)
          RFr <- R %*% (val*F)
          C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
          z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
@@ -190,7 +189,7 @@ for (i in 1:nind) {
      nonlin.par[i,]=opt[[i]]$par
      par <- split(nonlin.par[i,], group)
      dat[nm] <- lapply(par, "[", id)
-     val <- eval(Curve, dat)
+     val <- eval(formula, dat)
      Fr <- val*F
      RFr <- R %*% Fr
      S21 <- t(RFr) %*% RYr
@@ -266,7 +265,7 @@ out <- list(call = match.call(),
                                 time = time,
                                 xscores = fitted.val,
                                 yscores = observed.val),
-            ref = ref, # reference level, not implemented yet (could be NULL?)
+            ref = ref, # could be NULL?
             nonlinear.parameters = as.data.frame(nonlin.par),
             R.square = R.square,
             y = y.list,
