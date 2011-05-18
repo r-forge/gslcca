@@ -4,7 +4,7 @@ print.ESLCCA <- function(x, digits = max(3, getOption("digits") - 3), ...){
     if (x$global.roots != 0)
         cat("Data pre-smoothed using", x$global.roots, "roots\n")
 
-    ns <- NCOL(x$ycoef)
+    ns <- NROW(x$ycoef)
     if (ns != 1) {
         cat("ESLCCA based on", ns, "subjects\n")
         if (x$subject.roots != 0) {
