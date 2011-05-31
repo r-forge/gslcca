@@ -1,10 +1,10 @@
-ESLCCA <- function (Y, # matrix of power spectra
+            ESLCCA <- function (Y, # matrix of power spectra
                     time, # time points
-                    formula = 'DoubleExponential', # use built-in for now, implement formula later
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
                     treatment = NULL, # treatment factor (allow NULL => single curve?)
                     ref = 1, # reference level (allow NULL => no control?)
                     na.action,
+                    Curve = 'DoubleExponential', # use built-in for now, implement formula later
                     data.roots=0,subject.roots=-1,con=TRUE,
                     separate=TRUE,
                     start = NULL,
@@ -84,32 +84,33 @@ if (subject.roots<=0) {
 # In the case that the curve is not specified by the user, then the default is
 # the double exponential (with positive rate parameters) and the default initial
 # values are following
-if (is.character(formula)) {
-    start <- switch(formula,
-                    "DoubleExponential" = list(K1 = rep(8.5, nvar), K2 = rep(9, nvar)),
-                    "CriticalExponential" = list(K1 = rep(8.5, nvar)))
-}
-
 if (is.null(start)) {
-    stop('No initial values have been specified for the nonlinear parameters.')
+    if (!is.expression(Curve)) {
+        if (Curve == 'DoubleExponential') start <- list(K1 = rep(8.5, nvar), K2 = rep(9, nvar))
+        if (Curve == 'CriticalExponential') start <- list(K1 = rep(8.5, nvar))
+    }else{
+        stop('No initial values have been specified for the nonlinear parameters.')
+    }
 }
 else {
     start <- mapply(function(start, label, nvar) {
         if (length(start) == 1) rep(start, nvar)
         else if (length(start) == nvar) start
         else stop("there should be 1 or", nvar, "starting values for parameter", label, "\n")
-    }, start = start, label = names(start), MoreArgs = list(nvar = nvar), SIMPLIFY = FALSE)
+    }, start = start, label = names(start), MoreArgs = list(nvar = nvar))
 }
 nPar <- length(start)
 group <- gl(nPar, nvar, labels = names(start))
 
-if (is.character(formula)) {
-    formula <- switch(formula,
-                      "DoubleExponential" = expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
-                          (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) ),
-                      "CriticalExponential" = expression(time*exp(-time/exp(K1))))
+if (!is.expression(Curve)) {
+    if (Curve == 'DoubleExponential') {
+        Curve <- expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) + (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) )
+    }
+    else if (Curve == 'CriticalExponential') {
+        Curve <- expression(time*exp(-time/exp(K1)))
+    }
 }
-else formula <- as.expression(formula[[length(formula)]])
+
 CCA.roots = 1
 
 nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
@@ -178,7 +179,7 @@ for (i in 1:nind) {
      obj.f=function(Kvector) {
          par <- split(Kvector, group)
          dat[nm] <- lapply(par, "[", id)
-         val <- eval(formula, dat)
+         val <- eval(Curve, dat)
          RFr <- R %*% (val*F)
          C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
          z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
@@ -189,7 +190,7 @@ for (i in 1:nind) {
      nonlin.par[i,]=opt[[i]]$par
      par <- split(nonlin.par[i,], group)
      dat[nm] <- lapply(par, "[", id)
-     val <- eval(formula, dat)
+     val <- eval(Curve, dat)
      Fr <- val*F
      RFr <- R %*% Fr
      S21 <- t(RFr) %*% RYr
@@ -197,25 +198,27 @@ for (i in 1:nind) {
      Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
      optEigvalue=Eigvectors[,CCA.roots]
      Gamma[i,]= Re(V%*%S11.sqrt%*%optEigvalue)
-     Theta= Re(S22.inv.S21%*%Eigvectors)
+     Theta= Re(S22.inv.S21%*%S11.sqrt%*%Eigvectors)
      RFrTheta=RFr%*%Theta
      Norm <- colSums(RFrTheta^2)
-     Theta=Theta/sqrt(matrix(Norm,nrow(Theta),ncol=ncol(Theta),byrow=T))
+#     Theta=Theta/sqrt(matrix(Norm,nrow(Theta),ncol=ncol(Theta),byrow=T))
      RFrTheta=RFr%*%Theta[,CCA.roots]
      hRFrTheta <- RFrTheta[include][-(1:10)]
      cond=hRFrTheta[abs(hRFrTheta)==max(abs(hRFrTheta))]
     # if   (cond[1]<0) {Gamma[i,]=-Gamma[i,]; RFrTheta=-RFrTheta}
-     y.list[[i]]=tcrossprod(RYr,V)
+     y.list[[i]]=Yr
      observed.val=c( observed.val, y.list[[i]]%*%Gamma[i,] )
-     fitted.val=c(fitted.val,RFrTheta)
      Theta.m=cbind(Theta.m,Theta[,1])
      f.min=c(f.min,Re(opt[[i]]$value))
-     x.list[[i]]=cbind(RFr,G)
+     x.list[[i]]=cbind(rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),Fr),G)
      # Save intercept and covariates linear parameters.
-     Y.tilde=ginv(R2)%*%Yr%*%as.matrix(Gamma[i,])
+     Y.tilde=y.list[[i]]%*%as.matrix(Gamma[i,])
      F.tilde=c(rep(0,sum(include==0)),Fr%*%Theta[,1])
-     if (case != 2) { C=solve(crossprod(G))%*%t(G)%*%(Y.tilde-F.tilde) }
+     if (case != 2) {
+         C=solve(crossprod(G))%*%t(G)%*%(Y.tilde-F.tilde)
+         }
      linear.par=cbind(linear.par,C)
+     fitted.val=c(fitted.val,x.list[[i]]%*%c(Theta[,CCA.roots],C))
 }
 
 l_ind=levels(subject)
@@ -227,6 +230,7 @@ if (sum(sign_sign)<=sum(sign_sign==F)) {
      Gamma[sign_sign,]=-Gamma[sign_sign,]
      fitted.val[subject %in% sl_ind] = - fitted.val[subject %in% sl_ind]
      observed.val[subject %in% sl_ind] = - observed.val[subject %in% sl_ind]
+     
 }  else {
 sl_ind= l_ind[sign_sign==F]
      Gamma[sign_sign==F,]=-Gamma[sign_sign==F,]
@@ -265,7 +269,7 @@ out <- list(call = match.call(),
                                 time = time,
                                 xscores = fitted.val,
                                 yscores = observed.val),
-            ref = ref, # could be NULL?
+            ref = ref, # reference level, not implemented yet (could be NULL?)
             nonlinear.parameters = as.data.frame(nonlin.par),
             R.square = R.square,
             y = y.list,
