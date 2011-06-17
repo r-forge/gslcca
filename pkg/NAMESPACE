@@ -1,10 +1,13 @@
 export(ESLCCA)
 
-importFrom(reshape, cast)
-importFrom(lattice, xyplot) #other lattice functions necessary?
+import(colorspace) #rainbow_hcl, hex, polarLUV
+import(lattice) # xyplot, trellis.[un]focus, trellis.currentLayout
 
-S3method(formula, ESLCCA)
-S3method(coef, ESLCCA)
+importFrom(reshape, cast)
+importFrom(nnet, class.ind)
+
+#S3method(formula, ESLCCA)
+#S3method(coef, ESLCCA)
 S3method(plot, ESLCCA)
 S3method(print, ESLCCA)
 S3method(summary, ESLCCA)

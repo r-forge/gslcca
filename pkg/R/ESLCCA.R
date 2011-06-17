@@ -1,283 +1,262 @@
-            ESLCCA <- function (Y, # matrix of power spectra
+ESLCCA <- function (Y, # matrix of power spectra
                     time, # time points
+                    formula = "Double Exponential", # use built-in for now, implement formula later
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
                     treatment = NULL, # treatment factor (allow NULL => single curve?)
                     ref = 1, # reference level (allow NULL => no control?)
-                    na.action,
-                    Curve = 'DoubleExponential', # use built-in for now, implement formula later
-                    data.roots=0,subject.roots=-1,con=TRUE,
-                    separate=TRUE,
+                    separate = TRUE, #fit separate nonlinear parameters for each treatment?
+                    partial = ~1,
+                    data = NULL,
+                    global.smooth = FALSE,
+                    subject.smooth = TRUE,
                     start = NULL,
                     ...) { # allow arguments to be passed to optim
-
-# Upload required R libraries
-library(MASS)
-
-# Prepare the data
-if (missing(na.action)) na.action <- getOption("na.action")
-Y <- match.fun(na.action)(Y)
-f <- suppressWarnings(as.numeric(colnames(Y)))
-if (any(is.na(f))) f <- seq_along(f)
-
-n <- nrow(Y)
-if (!(length(subject) %in% c(0, n))) stop("length of 'subject' must equal nrow(Y)")
-if (!(length(treatment) %in% c(0, n))) stop("length of 'treatment' must equal nrow(Y)")
-if (missing(time) || length(time) != n) stop("'time' must be specified and have length equal to nrow(Y)")
-
-if (length(attr(Y, "na.action"))){
-    if (!missing(subject)) subject <- subject[-attr(Y, "na.action")]
-    if (!missing(treatment)) treatment <- treatment[-attr(Y, "na.action")]
-    time <- time[-attr(Y, "na.action")]
-}
-
-##### assume treatment non-NULL for now #######
-treatment <- as.factor(treatment)
-if (is.numeric(ref)) ref <- levels(treatment)[ref]
-include <- treatment != ref #can ignore reference level in computations
-id <- unclass(factor(treatment[include]))
-
-subject <- as.factor(subject)
-
-# Pre-smoothing of the complete data set for artifacts removal
-if (data.roots!=0) {
-    if  (data.roots==-1) {
-         Ytemp= scale(Y,scale=F)
-         eig=cbind(eigen(crossprod(Ytemp))$values)
-         nroots=1:length(eig)
-         data.roots=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
+    ## Formula must be a function of "time", possibly other var and parameters
+    if (is.character(formula)){
+        models <- c("Double Exponential", "Critical Exponential")
+        formula <- models[agrep(formula, models)]
+        if (!length(formula)) stop("\"formula\" not recognised, only \"Double Exponential\" or \"Critical Exponential\" \n",
+                                   "can be specified as character strings")
+        start <- switch(formula, #replicate later for multiple treatments
+                        "Double Exponential" = list(K1 = 8.5, K2 = 9),
+                        "Critical Exponential" = list(K1 = 8.5))
+        formula <- switch(formula,
+                          "Double Exponential" = ~ (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
+                              (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) ,
+                          "Critical Exponential" = ~ time*exp(-time/exp(K1)))
     }
-    SVD = svd( Y, nu=data.roots, nv=data.roots )
-    Y = SVD$u%*%diag(SVD$d[1:data.roots],ncol=data.roots)%*%t(SVD$v)
-}
 
-Y=Y-apply(Y,1,min)
-nind=nlevels(subject)
-ntreat=nlevels(treatment)
-Gamma=matrix(nrow=nind,ncol=length(f))
-observed.val = c()
-if (separate==TRUE) {
-    nvar=ntreat-1
-    size = function() {n_vec}
-} else {
-    nvar=1
-    size = function() {nr-nv}
-}
+    vars <- all.vars(formula)
+    if (!"time" %in% vars) stop("'formula' must be a function of 'time'")
 
-if (subject.roots<=0) {
-    if (subject.roots==0) {
-        # No smoothing case, so r will be equal to the rank of the data matrix
-        subject.roots = min(c(min(table(subject)),length(f)))
-    } else {
-        # Default smoothing
-        subject.roots = c()
-        eig = c()
-        for (i in 1:nind) {
-             Ytemp = scale(Y[subject==levels(subject)[i],],scale=F)
-             eig = cbind(eigen(crossprod(Ytemp))$values)
-             nroots = 1:length(eig)
-             subject.roots = c(subject.roots,max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]))
+    ## anything without starting values assumed to be a variable
+    vars <- setdiff(c(vars, all.vars(partial)), c("time", names(start)))
+    dummy <- reformulate(c("0", vars)) #don't need intercept for model frame
+    formula <- as.expression(formula[[length(formula)]])
+
+    ## Collate data to ensure equal length and deal with NAs across all variables
+    ## get model frame including Y, time, subject & treatment if specified, omit NAs
+    mf <- match.call(expand.dots = FALSE)
+    m <- match(c("Y", "subject", "treatment", "time", "data"), names(mf), 0L)
+    mf <- mf[c(1L, m)]
+    mf$formula <- dummy
+    mf$na.action <- na.omit
+    mf[[1L]] <- as.name("model.frame")
+    mf <- eval(mf, parent.frame())
+
+    ## split up again for convenience
+    Y <- mf$`(Y)`
+    f <- suppressWarnings(as.numeric(colnames(Y)))
+    if (any(is.na(f))) f <- seq_along(f)
+
+    subject <- as.factor(mf$`(subject)`)
+    if (is.null(subject)) subject <- 1 #is this enough?
+
+    if (!is.null(mf$`(treatment)`)) {
+        treatment <- as.factor(treatment)
+        if (is.numeric(ref)) ref <- levels(treatment)[ref]
+        include <- treatment != ref #can ignore reference level in computations
+        id <- unclass(factor(treatment[include]))
+        ntrt <- nlevels(treatment) - 1
+    }
+    else ntrt <- 1
+
+    if (is.null(mf$`(time)`)) stop("'time' must be specified and have length equal to", nrow(Y), "\n")
+    names(mf)[match("(time)", names(mf))] <- "time"
+
+    ## leave only covariates in mf
+    mf <- mf[, !(names(mf) %in% c("(Y)", "(time)", "(subject)", "(treatment)")), drop = FALSE]
+    mt <- terms(partial)
+    if (!is.empty.model(partial)) {
+        G <- model.matrix(mt, mf[1,]) #temp value to find number of parameters associated with covariates
+        np <- ncol(G)
+    }
+    else np <- 0
+    nind=nlevels(subject)
+    xcoef=matrix(, nr = ntrt + np, ncol = nind)
+
+    ## Pre-smoothing of the complete data set for artefacts removal
+    if (global.smooth) {
+        if (global.smooth == TRUE) {
+            Ytemp= scale(Y,scale=F)
+            eig=cbind(eigen(crossprod(Ytemp))$values)
+            nroots=1:length(eig)
+            global.smooth=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
         }
-        subject.roots = max(subject.roots)+1
+        SVD = svd( Y, nu=global.smooth, nv=global.smooth )
+        Y = SVD$u%*%diag(SVD$d[1:global.smooth],ncol=global.smooth)%*%t(SVD$v)
     }
-}
 
-# In the case that the curve is not specified by the user, then the default is
-# the double exponential (with positive rate parameters) and the default initial
-# values are following
-if (is.null(start)) {
-    if (!is.expression(Curve)) {
-        if (Curve == 'DoubleExponential') start <- list(K1 = rep(8.5, nvar), K2 = rep(9, nvar))
-        if (Curve == 'CriticalExponential') start <- list(K1 = rep(8.5, nvar))
-    }else{
+    ycoef=matrix(nrow=nind,ncol=length(f))
+    n <- nrow(Y)
+    yscores = numeric(n)
+
+    if (subject.smooth == TRUE) {
+        ## Automatically select number of roots
+        subject.smooth <- numeric(nind)
+        for (i in seq_len(nind)) {
+            Ytemp = scale(Y[subject==levels(subject)[i],],scale=F)
+            eig = eigen(crossprod(Ytemp), only.values = TRUE)
+            nroots = seq_along(eig)
+            subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98])
+        }
+        subject.smooth = max(subject.smooth)+1
+    }
+    else if (!is.numeric(subject.smooth)) {
+        ## No smoothing case, so r will be equal to the rank of the data matrix
+        subject.smooth = min(c(min(table(subject)),length(f)))
+    }
+
+    reps <- ifelse(separate, ntrt, 1)
+    if (is.null(start)) {
         stop('No initial values have been specified for the nonlinear parameters.')
     }
-}
-else {
-    start <- mapply(function(start, label, nvar) {
-        if (length(start) == 1) rep(start, nvar)
-        else if (length(start) == nvar) start
-        else stop("there should be 1 or", nvar, "starting values for parameter", label, "\n")
-    }, start = start, label = names(start), MoreArgs = list(nvar = nvar))
-}
-nPar <- length(start)
-group <- gl(nPar, nvar, labels = names(start))
-
-if (!is.expression(Curve)) {
-    if (Curve == 'DoubleExponential') {
-        Curve <- expression( (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) + (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) )
+    else {
+        start <- mapply(function(start, label, reps) {
+            if (length(start) == 1) rep(start, reps)
+            else if (length(start) == reps) start
+            else stop("there should be 1 or", reps, "starting values for parameter", label, "\n")
+        }, start = start, label = names(start), MoreArgs = list(reps = reps), SIMPLIFY = FALSE)
     }
-    else if (Curve == 'CriticalExponential') {
-        Curve <- expression(time*exp(-time/exp(K1)))
+    nPar <- length(start)
+    group <- gl(nPar, reps, labels = names(start))
+
+    CCA.roots = 1
+
+    nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
+
+    f.min=numeric(nind)
+    y.list=list()
+    x.list=list()
+    opt <- list()
+
+    corr=numeric(nind)
+    xscores=numeric(n)
+
+    for (i in 1:nind) {
+        ## Do SVD on Y
+        Indsubject = subject==levels(subject)[i]
+        Yr = Y[Indsubject,]
+        nr=nrow(Yr)
+        SVD = svd( Yr, nu=subject.smooth, nv=subject.smooth )
+        Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.smooth]),y=SVD$v)
+        ## Calculate the idempotent matrix R
+        if (is.empty.model(partial)){
+            R = diag(nr)
+        }
+        else{
+            G <- model.matrix(mt, subset(mf, Indsubject))
+            R = diag(nr)-G%*%solve(crossprod(G))%*%t(G)
+        }
+        RYr=R%*%Yr ## better to compute directly as resids?
+        ## Reduce the dimensionality using svd
+        rank.RYr=qr(RYr)$rank
+        SVD = svd( RYr, nu=rank.RYr, nv=rank.RYr )
+        D<-diag(SVD$d[1:rank.RYr],ncol=rank.RYr)
+        U1<-SVD$u
+        V<-SVD$v
+        RYr=U1%*%D
+        S11=crossprod(RYr)
+        S11.eig <- eigen(S11)
+        S11.val=suppressWarnings(sqrt(S11.eig$values))
+        S11.val[is.na(S11.val)]=0
+        S11.sqrt <- solve(S11.eig$vectors %*% tcrossprod(diag(S11.val,ncol=length(S11.val)),S11.eig$vectors) )
+        if (!is.null(treatment)) {
+            include <-  treatment[Indsubject] != ref #can ignore reference level when finding nonlin par
+            id <- unclass(factor(treatment[Indsubject][include]))
+            R <- R[,include]
+            dat <- subset(mf, Indsubject & include)
+            F <- class.ind(id)
+            if (!separate) id <- 1
+        }
+        else {
+            dat <- subset(mf, Indsubject)
+            F <- id <- 1
+            include <- TRUE
+        }
+        nm <- names(start)
+        obj.f=function(Kvector) {
+            par <- split(Kvector, group)
+            dat[nm] <- lapply(par, "[", id)
+            val <- eval(formula, dat)
+            RFr <- R %*% (val*F)
+            C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
+            z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
+            log(1-eigen(crossprod(z), symmetric = TRUE, only.values = TRUE)$values[1])
+        }
+        ## Minimize ln(1-largesteigenvalue(Corr))
+        opt[[i]] <- optim(unlist(start), obj.f, ...)
+        nonlin.par[i,]=opt[[i]]$par
+        par <- split(nonlin.par[i,], group)
+        dat[nm] <- lapply(par, "[", id)
+        val <- eval(formula, dat)
+        Fr <- val*F
+        RFr <- R %*% Fr
+        S21 <- t(RFr) %*% RYr
+        S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
+        Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
+        ycoef[i,]= Re(V%*%S11.sqrt%*%Eigvectors[,CCA.roots])
+        B= Re(S22.inv.S21%*%S11.sqrt%*%Eigvectors[,CCA.roots])
+        RFrB=RFr%*%B
+        Norm <- sqrt(colSums(RFrB^2))
+        B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
+        RFrB=RFr%*%B
+        y.list[[i]]=Yr
+        yscores[Indsubject] = y.list[[i]]%*%ycoef[i,]
+        f.min[i]=Re(opt[[i]]$value)
+        ## Save intercept and covariates linear parameters.
+        if (length(include) > 1) x.list[[i]]=rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),Fr)
+        else x.list[[i]]=Fr
+        xscores[Indsubject] = x.list[[i]]%*%B
+        corr[i] <- cor(yscores[Indsubject], xscores[Indsubject])
+        if (!is.empty.model(partial)) {
+            x.list[[i]]=cbind(x.list[[i]],G)
+            lin <- lm.fit(G, yscores[Indsubject]/corr[i] - xscores[Indsubject])
+            xcoef[,i] <- c(B, lin$coef)
+            xscores[Indsubject] = xscores[Indsubject] + fitted(lin)
+        }
+        else xcoef[,i] <- B
+        if (cor(yscores[Indsubject], rowSums(y.list[[i]])) < 0) {
+            xcoef[,i] <- -xcoef[,i]
+            xscores[Indsubject] <- -xscores[Indsubject]
+            ycoef[i,] <- -ycoef[i,]
+            yscores[Indsubject] <- -yscores[Indsubject]
+        }
     }
-}
 
-CCA.roots = 1
+    if (!is.null(treatment)) treatment_c <- paste("", setdiff(levels(treatment), ref))
+    else treatment_c <- ""
+    rownames(nonlin.par)= paste('subject',levels(subject))
+    colnames(nonlin.par)= paste(rep(paste('Parameter',1:nPar),rep(reps,nPar)),rep(ifelse(separate, treatment_c, ""),nPar), sep = "")
 
-nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
+    if (!is.null(subject)) colnames(xcoef)=as.character(paste('subject',levels(subject)))
+    if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
+    else rownames(xcoef)=paste('formula', treatment_c)
 
-Theta.m=c()
-linear.par = C = G = c()
-f.min=c()
-y.list=list()
-x.list=list()
-opt <- list()
+    ycoef <- as.data.frame(ycoef)
+    colnames(ycoef) <- f
+    if (!is.null(subject)) rownames(ycoef) <- levels(subject)
 
-corr_mat=matrix(ncol=nind,nrow=nlevels(treatment))
-fitted.val=c()
+    R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(rownames(nonlin.par),'R^2')))
 
-if (!is.numeric(con)) {
-      if (con==TRUE) {
-          case = 1
-      } else {
-          case = 2
-      }
-  } else {
-      case = 3
-}
-
-for (i in 1:nind) {
-     # Do PCA on Y
-     Indsubject = subject==levels(subject)[i]
-     Yr = Y[Indsubject,]
-     nr=nrow(Yr)
-     SVD = svd( Yr, nu=subject.roots, nv=subject.roots )
-     Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.roots]),y=SVD$v)
-     # Calculate the idempotent matrix R
-     I = rep(1,nr)
-     if (!is.numeric(con)) {
-         if (case==1) {
-             G=I
-             R = diag(nr) - matrix(1/nr, nr, nr)
-         } else {
-             R = diag(I)
-         }
-     } else {
-         G=con[Indsubject,]
-         R = diag(I)-G%*%solve(crossprod(G))%*%t(G)
-     }
-     RYr=R%*%Yr
-     # Reduce the dimensionality using svd
-     rank.RYr=qr(RYr)$rank
-     SVD = svd( RYr, nu=rank.RYr, nv=rank.RYr )
-     D<-diag(SVD$d[1:rank.RYr],ncol=rank.RYr)
-     U1<-SVD$u
-     V<-SVD$v
-     RYr=U1%*%D
-     S11=crossprod(RYr)
-     S11.eig <- eigen(S11)
-     S11.val=suppressWarnings(sqrt(S11.eig$values))
-     S11.val[is.na(S11.val)]=0
-     S11.sqrt <- solve(S11.eig$vectors %*% tcrossprod(diag(S11.val,ncol=length(S11.val)),S11.eig$vectors) )
-     include <-  treatment[Indsubject] != ref #can ignore reference level when finding nonlin par
-     id <- unclass(factor(treatment[Indsubject][include]))
-     R2=R
-     R <- R[,include]
-     dat <- data.frame(time = time[Indsubject][include])
-     nm <- names(start)
-     env <- environment(dat)
-     F <- class.ind(id)
-     obj.f=function(Kvector) {
-         par <- split(Kvector, group)
-         dat[nm] <- lapply(par, "[", id)
-         val <- eval(Curve, dat)
-         RFr <- R %*% (val*F)
-         C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
-         z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
-         log(1-eigen(crossprod(z), symmetric = TRUE, only.values = TRUE)$values[1])
-     }
-     # Minimize ln(1-largesteigenvalue(Corr))
-     opt[[i]] <- optim(unlist(start), obj.f, ...)
-     nonlin.par[i,]=opt[[i]]$par
-     par <- split(nonlin.par[i,], group)
-     dat[nm] <- lapply(par, "[", id)
-     val <- eval(Curve, dat)
-     Fr <- val*F
-     RFr <- R %*% Fr
-     S21 <- t(RFr) %*% RYr
-     S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
-     Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
-     optEigvalue=Eigvectors[,CCA.roots]
-     Gamma[i,]= Re(V%*%S11.sqrt%*%optEigvalue)
-     Theta= Re(S22.inv.S21%*%S11.sqrt%*%Eigvectors)
-     RFrTheta=RFr%*%Theta
-     Norm <- colSums(RFrTheta^2)
-#     Theta=Theta/sqrt(matrix(Norm,nrow(Theta),ncol=ncol(Theta),byrow=T))
-     RFrTheta=RFr%*%Theta[,CCA.roots]
-     hRFrTheta <- RFrTheta[include][-(1:10)]
-     cond=hRFrTheta[abs(hRFrTheta)==max(abs(hRFrTheta))]
-    # if   (cond[1]<0) {Gamma[i,]=-Gamma[i,]; RFrTheta=-RFrTheta}
-     y.list[[i]]=Yr
-     observed.val=c( observed.val, y.list[[i]]%*%Gamma[i,] )
-     Theta.m=cbind(Theta.m,Theta[,1])
-     f.min=c(f.min,Re(opt[[i]]$value))
-     x.list[[i]]=cbind(rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),Fr),G)
-     # Save intercept and covariates linear parameters.
-     Y.tilde=y.list[[i]]%*%as.matrix(Gamma[i,])
-     F.tilde=c(rep(0,sum(include==0)),Fr%*%Theta[,1])
-     if (case != 2) {
-         C=solve(crossprod(G))%*%t(G)%*%(Y.tilde-F.tilde)
-         }
-     linear.par=cbind(linear.par,C)
-     fitted.val=c(fitted.val,x.list[[i]]%*%c(Theta[,CCA.roots],C))
-}
-
-l_ind=levels(subject)
-mydata.pca <- princomp(t(Gamma))
-loading <- mydata.pca$loadings[,1]
-sign_sign= loading>0
-sl_ind=l_ind[sign_sign]
-if (sum(sign_sign)<=sum(sign_sign==F)) {
-     Gamma[sign_sign,]=-Gamma[sign_sign,]
-     fitted.val[subject %in% sl_ind] = - fitted.val[subject %in% sl_ind]
-     observed.val[subject %in% sl_ind] = - observed.val[subject %in% sl_ind]
-     
-}  else {
-sl_ind= l_ind[sign_sign==F]
-     Gamma[sign_sign==F,]=-Gamma[sign_sign==F,]
-     fitted.val[subject %in% sl_ind] = - fitted.val[subject %in% sl_ind]
-     observed.val[subject %in% sl_ind] = - observed.val[subject %in% sl_ind]
-}
-
-treatment_c <- setdiff(levels(treatment), ref)
-rownames(nonlin.par)=as.character(paste('subject',levels(subject)))
-if (separate==T) {
-colnames(nonlin.par)= paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)),rep(treatment_c,nPar))
-} else {
-colnames(nonlin.par)=paste(rep(paste('Parameter',1:nPar),rep(nvar,nPar)))
-}
-
-if (case != 1) {
-    rownames(linear.par) = colnames(con)
-} else {
-    rownames(linear.par) = 'Intercept'
-}
-colnames(Theta.m)=as.character(paste('subject',levels(subject)))
-rownames(Theta.m)=treatment_c
-xcoef = rbind(Theta.m, linear.par)
-
-ycoef <- as.data.frame(Gamma)
-colnames(ycoef) <- f
-rownames(ycoef) <- levels(subject)
-
-R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(rownames(nonlin.par),'R^2')))
-
-out <- list(call = match.call(),
-            ycoef = ycoef, # 'signatures' rownames = subject, colnames = freq
-            xcoef = xcoef, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
-            scores = data.frame(subject = subject,
-                                treatment = treatment,# could be NULL?
-                                time = time,
-                                xscores = fitted.val,
-                                yscores = observed.val),
-            ref = ref, # reference level, not implemented yet (could be NULL?)
-            nonlinear.parameters = as.data.frame(nonlin.par),
-            R.square = R.square,
-            y = y.list,
-            x = x.list,
-            global.roots = data.roots,
-            subject.roots = subject.roots,
-            opt = opt)
-class(out) <- "ESLCCA"
-out
+    out <- list(call = match.call(),
+                ycoef = ycoef, # 'signatures' rownames = subject, colnames = freq
+                xcoef = xcoef, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
+                yscores = yscores,
+                xscores = xscores,
+                subject = subject,
+                treatment = treatment,
+                time = mf$time,
+                ref = ref, # reference level, not implemented yet (could be NULL?)
+                nonlinear.parameters = as.data.frame(nonlin.par),
+                R.square = R.square,
+                corr = corr,
+                y = y.list,
+                x = x.list,
+                global.roots = global.smooth,
+                subject.roots = subject.smooth,
+                opt = opt)
+    class(out) <- "ESLCCA"
+    out
 }
 

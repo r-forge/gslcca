@@ -1,0 +1,21 @@
+## R >= 2.8.0 passes package metadata to citation().
+if(!exists("meta") || is.null(meta)) meta <- packageDescription("ESLCCA")
+year <- sub("-.*", "", meta$Date)
+note <- sprintf("R package version %s", meta$Version) 
+url <- sprintf("http://CRAN.R-project.org/package=ESLCCA", meta$Version) 
+
+citEntry(entry="Manual",
+    title = {"ESLCCA: An R package for Extended Semi-Linear Canonical Correlation Analysis"},
+    author = personList(as.person("Foteini Strimenopoulou"),
+                        as.person("Heather Turner"),
+								as.person("Phil Brain")),
+    year = year,
+    note = note,
+    url = url,
+    textVersion = paste(
+      "Foteini Strimenopoulou, Heather Turner and Phil Brain", sprintf("(%s).", year),
+      "ESLCCA: An R package for Extended Semi-Linear Canonical Correlation Analysis",
+      sprintf("(%s).", note), sprintf("(%s).", url))
+)
+
+

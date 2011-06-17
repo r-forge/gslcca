@@ -10,7 +10,7 @@
 }
 \usage{
 ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
-    treatment = NULL, ref = 1, covariates = ~ 1, data, na.action,
+    treatment = NULL, ref = 1, partial = ~1, data, na.action,
     global.smooth = FALSE, subject.smooth = TRUE, start = NULL)
 }
 \arguments{
@@ -29,16 +29,14 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
     \code{formula} should be estimated. }
   \item{ref}{ the reference level of \code{treatment} for
     which \code{formula} is set to \code{~ 0} (may be \code{NULL}). }
-  \item{covariates}{ a linear model formula specifying
-    covariates to adjust for in the model (may be \code{NULL}).}
+  \item{partial}{ a linear model formula specifying covariates to
+    partial out of the CCA analysis (may be \code{NULL}).}
   \item{data}{ an optional data frame in which to evaluate the variables
-    in \code{formula}, \code{time}, \code{subject}, \code{treatment} and
-    \code{covariates}. }
+    in \code{time}, \code{subject}, \code{treatment} and \code{partial}. }
   \item{global.smooth}{ controls the smoothing of \code{Y} via SVD. Must
     be one of \code{FALSE} for no smoothing, \code{TRUE} for smoothing
     with an automatically selected number of roots, or a scalar specifying the
     number of roots to use. }
-  }
   \item{subject.smooth}{ controls the smoothing of \code{Y} within the
     levels of \code{subject}. Accepts the same values as \code{global.smooth}. }
   \item{start}{ a named list of starting values for the parameters. Each
@@ -65,19 +63,17 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
   vectors of coefficients of the functions and covariates.
 
   Setting \eqn{X(t, \theta) = (\mathbf{F(t, \theta)}|
-  \mathbf{G(t)}}{X(t, theta) = (F(t, theta):G(t))} and \eqn{D =
+  \mathbf{G(t)})}{X(t, theta) = (F(t, theta):G(t))} and \eqn{D =
   (B'|C')}, the model is in a form suitable for canonical correlation
   analysis. The parameters \eqn{\mathbf{A}, \theta}{A, theta} and
   \eqn{\mathbf{D}}{D} are thus estimated to optimise the correlation
-  between the left- and right-hand sides of the model. 
+  between the left- and right-hand sides of the model.
 
   The nonlinear function may be specified by a character string for two
   pharmacokinetic/pharmacodynamic models:
-  \describe{\code{"Double Exponential"}{
-    \code{~ exp(-time/exp(K1))-exp(-time/exp(K2))}
-  }
-  \describe{\code{"Critical Exponential"}{
-    \code{~ time*exp(-time/exp(K1)))}
+  \describe{
+    \item{\code{"Double Exponential"}}{\code{~ exp(-time/exp(K1))-exp(-time/exp(K2))}}
+    \item{\code{"Critical Exponential"}}{\code{~ time*exp(-time/exp(K1))}}
   }
 
   The data matrix \code{Y} may be pre-smoothed to remove global
@@ -101,12 +97,12 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
   \dfn{signatures}.
 
   The projected values \eqn{\mathbf{Y(t)} \times \mathbf{A}}{Y(t) * A}
-  and \eqn{\mathbf{X(t, \theta)} \times \mathbf{D}{X(t, theta) * D} are
+  and \eqn{\mathbf{X(t, \theta)} \times \mathbf{D}}{X(t, theta) * D} are
   known as the y scores and x scores respectively. In this context, they
   can be thought of as the (projected) observed and fitted values.
   
   Both signatures and fitted values can be visualised using
-  \code{\link{plot.ESLCCA}}.  
+  \code{\link{plot.ESLCCA}}. 
 }
 \value{
   An object of class \code{"ESLCCA"}, which is a list with components
