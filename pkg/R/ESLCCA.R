@@ -31,13 +31,13 @@ ESLCCA <- function (Y, # matrix of power spectra
 
     ## anything without starting values assumed to be a variable
     vars <- setdiff(c(vars, all.vars(partial)), c("time", names(start)))
-    dummy <- reformulate(c("0", vars)) #don't need intercept for model frame
+    dummy <- reformulate(c("0", vars), response = "Y") #don't need intercept for model frame
     formula <- as.expression(formula[[length(formula)]])
 
     ## Collate data to ensure equal length and deal with NAs across all variables
     ## get model frame including Y, time, subject & treatment if specified, omit NAs
     mf <- match.call(expand.dots = FALSE)
-    m <- match(c("Y", "subject", "treatment", "time", "data"), names(mf), 0L)
+    m <- match(c("subject", "treatment", "time", "data"), names(mf), 0L)
     mf <- mf[c(1L, m)]
     mf$formula <- dummy
     mf$na.action <- na.omit
@@ -45,12 +45,19 @@ ESLCCA <- function (Y, # matrix of power spectra
     mf <- eval(mf, parent.frame())
 
     ## split up again for convenience
-    Y <- mf$`(Y)`
+    Y <- mf$Y
+    nr <- nrow(Y)
     f <- suppressWarnings(as.numeric(colnames(Y)))
     if (any(is.na(f))) f <- seq_along(f)
 
-    subject <- as.factor(mf$`(subject)`)
-    if (is.null(subject)) subject <- 1 #is this enough?
+    if (!is.null(mf$`(subject)`)) {
+        subject <- as.factor(mf$`(subject)`)
+        ind <- split(seq_len(nr), subject)
+    }
+    else {
+        subject <- NULL
+        ind <- list(seq_len(nr))
+    }
 
     if (!is.null(mf$`(treatment)`)) {
         treatment <- as.factor(treatment)
@@ -72,7 +79,7 @@ ESLCCA <- function (Y, # matrix of power spectra
         np <- ncol(G)
     }
     else np <- 0
-    nind=nlevels(subject)
+    nind <- length(ind)
     xcoef=matrix(, nr = ntrt + np, ncol = nind)
 
     ## Pre-smoothing of the complete data set for artefacts removal
@@ -95,16 +102,12 @@ ESLCCA <- function (Y, # matrix of power spectra
         ## Automatically select number of roots
         subject.smooth <- numeric(nind)
         for (i in seq_len(nind)) {
-            Ytemp = scale(Y[subject==levels(subject)[i],],scale=F)
+            Ytemp = scale(Y[ind[[i]],],scale=F)
             eig = eigen(crossprod(Ytemp), only.values = TRUE)
             nroots = seq_along(eig)
             subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98])
         }
         subject.smooth = max(subject.smooth)+1
-    }
-    else if (!is.numeric(subject.smooth)) {
-        ## No smoothing case, so r will be equal to the rank of the data matrix
-        subject.smooth = min(c(min(table(subject)),length(f)))
     }
 
     reps <- ifelse(separate, ntrt, 1)
@@ -130,22 +133,23 @@ ESLCCA <- function (Y, # matrix of power spectra
     x.list=list()
     opt <- list()
 
-    corr=numeric(nind)
+    cor=numeric(nind)
     xscores=numeric(n)
 
     for (i in 1:nind) {
         ## Do SVD on Y
-        Indsubject = subject==levels(subject)[i]
-        Yr = Y[Indsubject,]
+        Yr = Y[ind[[i]],]
         nr=nrow(Yr)
-        SVD = svd( Yr, nu=subject.smooth, nv=subject.smooth )
-        Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.smooth]),y=SVD$v)
+        if (subject.smooth) {
+            SVD = svd( Yr, nu=subject.smooth, nv=subject.smooth )
+            Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.smooth]),y=SVD$v)
+        }
         ## Calculate the idempotent matrix R
         if (is.empty.model(partial)){
             R = diag(nr)
         }
         else{
-            G <- model.matrix(mt, subset(mf, Indsubject))
+            G <- model.matrix(mt, mf[ind[[i]], ])
             R = diag(nr)-G%*%solve(crossprod(G))%*%t(G)
         }
         RYr=R%*%Yr ## better to compute directly as resids?
@@ -162,15 +166,15 @@ ESLCCA <- function (Y, # matrix of power spectra
         S11.val[is.na(S11.val)]=0
         S11.sqrt <- solve(S11.eig$vectors %*% tcrossprod(diag(S11.val,ncol=length(S11.val)),S11.eig$vectors) )
         if (!is.null(treatment)) {
-            include <-  treatment[Indsubject] != ref #can ignore reference level when finding nonlin par
-            id <- unclass(factor(treatment[Indsubject][include]))
+            include <-  treatment[ind[[i]]] != ref #can ignore reference level when finding nonlin par
+            id <- unclass(factor(treatment[ind[[i]]][include]))
             R <- R[,include]
-            dat <- subset(mf, Indsubject & include)
+            dat <- mf[ind[[i]][include], ]
             F <- class.ind(id)
             if (!separate) id <- 1
         }
         else {
-            dat <- subset(mf, Indsubject)
+            dat <- mf[ind[[i]], ]
             F <- id <- 1
             include <- TRUE
         }
@@ -184,7 +188,7 @@ ESLCCA <- function (Y, # matrix of power spectra
             z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
             log(1-eigen(crossprod(z), symmetric = TRUE, only.values = TRUE)$values[1])
         }
-        ## Minimize ln(1-largesteigenvalue(Corr))
+        ## Minimize ln(1-largesteigenvalue(Cor))
         opt[[i]] <- optim(unlist(start), obj.f, ...)
         nonlin.par[i,]=opt[[i]]$par
         par <- split(nonlin.par[i,], group)
@@ -202,40 +206,40 @@ ESLCCA <- function (Y, # matrix of power spectra
         B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
         RFrB=RFr%*%B
         y.list[[i]]=Yr
-        yscores[Indsubject] = y.list[[i]]%*%ycoef[i,]
+        yscores[ind[[i]]] = y.list[[i]]%*%ycoef[i,]
+        cor[i] <- lm(yscores[ind[[i]]] ~ 0 + RFrB)$coef
         f.min[i]=Re(opt[[i]]$value)
         ## Save intercept and covariates linear parameters.
         if (length(include) > 1) x.list[[i]]=rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),Fr)
         else x.list[[i]]=Fr
-        xscores[Indsubject] = x.list[[i]]%*%B
-        corr[i] <- cor(yscores[Indsubject], xscores[Indsubject])
+        xscores[ind[[i]]] = x.list[[i]]%*%B
         if (!is.empty.model(partial)) {
             x.list[[i]]=cbind(x.list[[i]],G)
-            lin <- lm.fit(G, yscores[Indsubject]/corr[i] - xscores[Indsubject])
+            lin <- lm.fit(G, yscores[ind[[i]]]/cor[i] - xscores[ind[[i]]])
             xcoef[,i] <- c(B, lin$coef)
-            xscores[Indsubject] = xscores[Indsubject] + fitted(lin)
+            xscores[ind[[i]]] = xscores[ind[[i]]] + fitted(lin)
         }
         else xcoef[,i] <- B
-        if (cor(yscores[Indsubject], rowSums(y.list[[i]])) < 0) {
+        if (cor(yscores[ind[[i]]], rowSums(y.list[[i]])) < 0) {
             xcoef[,i] <- -xcoef[,i]
-            xscores[Indsubject] <- -xscores[Indsubject]
+            xscores[ind[[i]]] <- -xscores[ind[[i]]]
             ycoef[i,] <- -ycoef[i,]
-            yscores[Indsubject] <- -yscores[Indsubject]
+            yscores[ind[[i]]] <- -yscores[ind[[i]]]
         }
     }
 
     if (!is.null(treatment)) treatment_c <- paste("", setdiff(levels(treatment), ref))
     else treatment_c <- ""
-    rownames(nonlin.par)= paste('subject',levels(subject))
     colnames(nonlin.par)= paste(rep(paste('Parameter',1:nPar),rep(reps,nPar)),rep(ifelse(separate, treatment_c, ""),nPar), sep = "")
 
-    if (!is.null(subject)) colnames(xcoef)=as.character(paste('subject',levels(subject)))
     if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
     else rownames(xcoef)=paste('formula', treatment_c)
 
     ycoef <- as.data.frame(ycoef)
     colnames(ycoef) <- f
-    if (!is.null(subject)) rownames(ycoef) <- levels(subject)
+
+    if (!is.null(subject))
+        rownames(nonlin.par) <- colnames(xcoef) <- rownames(ycoef) <- paste('subject',levels(subject))
 
     R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(rownames(nonlin.par),'R^2')))
 
@@ -250,7 +254,7 @@ ESLCCA <- function (Y, # matrix of power spectra
                 ref = ref, # reference level, not implemented yet (could be NULL?)
                 nonlinear.parameters = as.data.frame(nonlin.par),
                 R.square = R.square,
-                corr = corr,
+                cor = cor,
                 y = y.list,
                 x = x.list,
                 global.roots = global.smooth,
