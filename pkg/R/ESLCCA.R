@@ -58,9 +58,10 @@ ESLCCA <- function (Y, # matrix of power spectra
         subject <- NULL
         ind <- list(seq_len(nr))
     }
+    nind <- length(ind)
 
     if (!is.null(mf$`(treatment)`)) {
-        treatment <- as.factor(treatment)
+        treatment <- as.factor(mf$`(treatment)`)
         if (is.numeric(ref)) ref <- levels(treatment)[ref]
         include <- treatment != ref #can ignore reference level in computations
         id <- unclass(factor(treatment[include]))
@@ -68,42 +69,30 @@ ESLCCA <- function (Y, # matrix of power spectra
     }
     else ntrt <- 1
 
-    if (is.null(mf$`(time)`)) stop("'time' must be specified and have length equal to", nrow(Y), "\n")
+    if (is.null(mf$`(time)`)) stop("'time' must be specified and have length equal to", nr, "\n")
     names(mf)[match("(time)", names(mf))] <- "time"
 
-    ## leave only covariates in mf
-    mf <- mf[, !(names(mf) %in% c("(Y)", "(time)", "(subject)", "(treatment)")), drop = FALSE]
-    mt <- terms(partial)
-    if (!is.empty.model(partial)) {
-        G <- model.matrix(mt, mf[1,]) #temp value to find number of parameters associated with covariates
-        np <- ncol(G)
-    }
-    else np <- 0
-    nind <- length(ind)
-    xcoef=matrix(, nr = ntrt + np, ncol = nind)
+    ## take out extras from mf
+    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")), drop = FALSE]
 
     ## Pre-smoothing of the complete data set for artefacts removal
     if (global.smooth) {
         if (global.smooth == TRUE) {
             Ytemp= scale(Y,scale=F)
-            eig=cbind(eigen(crossprod(Ytemp))$values)
-            nroots=1:length(eig)
+            eig=eigen(crossprod(Ytemp), only.values = TRUE)$values
+            nroots=seq_along(eig)
             global.smooth=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
         }
         SVD = svd( Y, nu=global.smooth, nv=global.smooth )
         Y = SVD$u%*%diag(SVD$d[1:global.smooth],ncol=global.smooth)%*%t(SVD$v)
     }
 
-    ycoef=matrix(nrow=nind,ncol=length(f))
-    n <- nrow(Y)
-    yscores = numeric(n)
-
     if (subject.smooth == TRUE) {
         ## Automatically select number of roots
         subject.smooth <- numeric(nind)
         for (i in seq_len(nind)) {
             Ytemp = scale(Y[ind[[i]],],scale=F)
-            eig = eigen(crossprod(Ytemp), only.values = TRUE)
+            eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
             nroots = seq_along(eig)
             subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98])
         }
@@ -124,17 +113,26 @@ ESLCCA <- function (Y, # matrix of power spectra
     nPar <- length(start)
     group <- gl(nPar, reps, labels = names(start))
 
+    ## evaluate RHS for first row of data
+    par <- as.list(rep(NA, length(start)))
+    names(par) <- names(start)
+    dat <- do.call("cbind", list(mf[1,, drop = FALSE], par))
+    val <- eval(formula, dat)
+    mt <- terms(partial)
+    if (!is.empty.model(partial)) {
+        G <- model.matrix(mt, mf[1,]) #temp value to find number of parameters associated with covariates
+        np <- ncol(G)
+    }
+    else np <- 0
     CCA.roots = 1
 
-    nonlin.par=matrix(nrow=nind,ncol=length(unlist(start)))
+    nonlin.par <- matrix(nrow=length(unlist(start)), ncol=nind)
+    ycoef <- matrix(nrow=length(f), ncol=nind)
+    xcoef <- matrix(nrow=length(val)*ntrt + np, ncol=nind)
 
-    f.min=numeric(nind)
-    y.list=list()
-    x.list=list()
-    opt <- list()
-
-    cor=numeric(nind)
-    xscores=numeric(n)
+    y.list <- x.list <- opt <- list()
+    yscores <- xscores  <- numeric(nr)
+    f.min <- cor <- numeric(nind)
 
     for (i in 1:nind) {
         ## Do SVD on Y
@@ -149,7 +147,7 @@ ESLCCA <- function (Y, # matrix of power spectra
             R = diag(nr)
         }
         else{
-            G <- model.matrix(mt, mf[ind[[i]], ])
+            G <- model.matrix(mt, mf[ind[[i]], , drop = FALSE])
             R = diag(nr)-G%*%solve(crossprod(G))%*%t(G)
         }
         RYr=R%*%Yr ## better to compute directly as resids?
@@ -169,12 +167,13 @@ ESLCCA <- function (Y, # matrix of power spectra
             include <-  treatment[ind[[i]]] != ref #can ignore reference level when finding nonlin par
             id <- unclass(factor(treatment[ind[[i]]][include]))
             R <- R[,include]
-            dat <- mf[ind[[i]][include], ]
+            dat <- mf[ind[[i]][include], , drop = FALSE]
             F <- class.ind(id)
             if (!separate) id <- 1
+            #F <- matrix(1, nrow = nrow(F), ncol = 1) # hack so separate = TRUE => sep nonlin par, but same lin par
         }
         else {
-            dat <- mf[ind[[i]], ]
+            dat <- mf[ind[[i]], , drop = FALSE]
             F <- id <- 1
             include <- TRUE
         }
@@ -190,8 +189,8 @@ ESLCCA <- function (Y, # matrix of power spectra
         }
         ## Minimize ln(1-largesteigenvalue(Cor))
         opt[[i]] <- optim(unlist(start), obj.f, ...)
-        nonlin.par[i,]=opt[[i]]$par
-        par <- split(nonlin.par[i,], group)
+        nonlin.par[,i]=opt[[i]]$par
+        par <- split(nonlin.par[,i], group)
         dat[nm] <- lapply(par, "[", id)
         val <- eval(formula, dat)
         Fr <- val*F
@@ -199,14 +198,14 @@ ESLCCA <- function (Y, # matrix of power spectra
         S21 <- t(RFr) %*% RYr
         S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
         Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
-        ycoef[i,]= Re(V%*%S11.sqrt%*%Eigvectors[,CCA.roots])
+        ycoef[,i]= Re(V%*%S11.sqrt%*%Eigvectors[,CCA.roots])
         B= Re(S22.inv.S21%*%S11.sqrt%*%Eigvectors[,CCA.roots])
         RFrB=RFr%*%B
         Norm <- sqrt(colSums(RFrB^2))
         B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
         RFrB=RFr%*%B
         y.list[[i]]=Yr
-        yscores[ind[[i]]] = y.list[[i]]%*%ycoef[i,]
+        yscores[ind[[i]]] = y.list[[i]]%*%ycoef[,i]
         cor[i] <- lm(yscores[ind[[i]]] ~ 0 + RFrB)$coef
         f.min[i]=Re(opt[[i]]$value)
         ## Save intercept and covariates linear parameters.
@@ -223,25 +222,25 @@ ESLCCA <- function (Y, # matrix of power spectra
         if (cor(yscores[ind[[i]]], rowSums(y.list[[i]])) < 0) {
             xcoef[,i] <- -xcoef[,i]
             xscores[ind[[i]]] <- -xscores[ind[[i]]]
-            ycoef[i,] <- -ycoef[i,]
+            ycoef[,i] <- -ycoef[,i]
             yscores[ind[[i]]] <- -yscores[ind[[i]]]
         }
     }
 
     if (!is.null(treatment)) treatment_c <- paste("", setdiff(levels(treatment), ref))
     else treatment_c <- ""
-    colnames(nonlin.par)= paste(rep(paste('Parameter',1:nPar),rep(reps,nPar)),rep(ifelse(separate, treatment_c, ""),nPar), sep = "")
+    rownames(nonlin.par)= paste(rep(names(start),rep(reps,nPar)),rep(ifelse(separate, treatment_c, ""),nPar), sep = "")
 
     if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
     else rownames(xcoef)=paste('formula', treatment_c)
 
     ycoef <- as.data.frame(ycoef)
-    colnames(ycoef) <- f
+    rownames(ycoef) <- f
 
     if (!is.null(subject))
-        rownames(nonlin.par) <- colnames(xcoef) <- rownames(ycoef) <- paste('subject',levels(subject))
+        colnames(nonlin.par) <- colnames(xcoef) <- colnames(ycoef) <- paste('subject',levels(subject))
 
-    R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(rownames(nonlin.par),'R^2')))
+    R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(colnames(nonlin.par),'R^2')))
 
     out <- list(call = match.call(),
                 ycoef = ycoef, # 'signatures' rownames = subject, colnames = freq

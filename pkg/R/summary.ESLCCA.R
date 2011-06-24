@@ -1,8 +1,10 @@
 summary.ESLCCA <- function(object, ...){
-    list(call = x$call,
-         global.roots = x$global.roots,
-         subject.roots = x$subject.roots,
-         nonlinear.parameters = x$nonlinear.parameters,
-         mean.signature = colMeans(x$ycoef),
-         mean.fitted = cast(x$scores, time ~ treatment, value = "xscores", fun.aggregate = mean))
+    res <- list(call = object$call,
+                global.roots = object$global.roots,
+                subject.roots = object$subject.roots,
+                nonlinear.parameters = object$nonlinear.parameters,
+                mean.signature = rowMeans(as.matrix(object$ycoef)),
+                mean.fitted = tapply(object$xscores, list(object$time, treatment), mean))
+    class(res) <- "summary.ESLCCA"
+    res
 }

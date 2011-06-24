@@ -1,5 +1,5 @@
 print.summary.ESLCCA <- function(x, digits = max(3, getOption("digits") - 3), ...){
-    cat("\nCall:\n", deparse(x$call), "\n", sep = "", fill = TRUE)
+    cat("\nCall:\n", deparse(x$call), sep = "", fill = TRUE)
 
     if (x$global.roots != 0)
         cat("Data pre-smoothed using", x$global.roots, "roots\n\n")
@@ -16,9 +16,9 @@ print.summary.ESLCCA <- function(x, digits = max(3, getOption("digits") - 3), ..
     cat("\nNonlinear parameters:\n")
     print(format(x$nonlinear.parameters, digits = digits))
 
-    cat(ifelse(ns != 1, "\nMean signature:\n", "Signature:\n"))
+    cat(ifelse(ns != 1, "\nMean signature:\n", "\nSignature:\n"))
     print.default(format(x$mean.signature, digits = digits), quote = FALSE)
 
-    cat(ifelse(ns != 1, "\nMean fitted values:\n", "Fitted values:\n"))
-    print(format(x$mean.fitted, digits = digits))
+    cat(ifelse(ns != 1, "\nMean fitted values:\n", "\nFitted values:\n"))
+    print(format(x$mean.fitted, digits = digits), quote = FALSE)
 }

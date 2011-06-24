@@ -1,5 +1,5 @@
-plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALSE,
-                        ask = dev.interactive(), lattice = FALSE,
+plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual = TRUE,
+                        overlay = FALSE, ask = dev.interactive(), lattice = FALSE,
                         main = NULL, xlab = NULL, ylab = NULL,
                         col = NULL, lty = NULL, pch = NULL, legend.x = "topright",
                         space = "bottom", corner = NULL, columns = 2, ...){
@@ -7,10 +7,6 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
     subject <- x$subject
     ns <- nlevels(subject)
     ls <- levels(subject)
-    treatment <- x$treatment
-    if (is.null(treatment)) treatment <- factor(rep.int(1, length(x$xscores)))
-    nt <- nlevels(treatment)
-    lt <- levels(treatment)
 
     ## count plots and set ask to FALSE if not needed (also reset on exit if necessary)
     nplots <- length(type)
@@ -27,7 +23,24 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
     if (!(signature | fitted))
         stop("\"type\" not recognised - must be \"signature\" or \"fitted\"")
     if (signature)
-        freq <- seq_len(ncol(x$ycoef))
+        freq <- seq_len(nrow(x$ycoef))
+
+    treatment <- series
+    if (is.null(treatment)) {
+        if (fitted) {
+            equal <- function(x){
+                if (length(x) > 1) isTRUE(do.call(all.equal, as.list(x)))
+                else TRUE
+            }
+            different <- !all(tapply(x$xscores, list(x$time), equal))
+            if (different)
+                stop("Different fitted values found for same time point - \n",
+                     "specify 'series' to separate different series.")
+        }
+        treatment <- factor(rep.int(1, length(x$xscores)))
+    }
+    nt <- nlevels(treatment)
+    lt <- levels(treatment)
 
     if (missing(xlab)) xlab <- ifelse(signature, "Frequency", "Time")
     if (missing(ylab)) ylab <- ifelse(signature, "Coefficient", "Score")
@@ -44,7 +57,7 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
     if (individual) {
         if (overlay) {
             if (signature) {
-                matplot(freq, t(x$ycoef), col=col,type='l', xlab= xlab, ylab= ylab, ...)
+                matplot(freq, x$ycoef, col=col,type='l', xlab= xlab, ylab= ylab, ...)
                 title(ifelse(missing(main), 'Signatures Corresponding to Different Subjects', main))
                 legend(x = legend.x,y=NULL, legend = paste('Subject',ls), col = col,
                        lty = lty, pch = NULL, merge = TRUE)
@@ -63,8 +76,8 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
         else if (lattice) {
             ## need to explicitly print plots as not typing directly into console
             if (signature) {
-                sig <- t(x$ycoef)
-                print(xyplot(sig ~ c(row(sig)) | rownames(x$ycoef)[col(sig)], type=c("l"), col = col, lty = lty,
+                sig <- as.matrix(x$ycoef)
+                print(xyplot(sig ~ c(row(sig)) | colnames(sig)[col(sig)], type=c("l"), col = col, lty = lty,
                              main = ifelse(missing(main), 'Signatures Corresponding to Different Subjects', main),
                              xlab= xlab, ylab = ylab, as.table = TRUE, ...))
             }
@@ -90,15 +103,17 @@ plot.ESLCCA <- function(x, type = "signature", individual = TRUE, overlay = FALS
             }
         }
         else {
-            yscores <- tapply(x$yscores, list(x$time, treatment, subject), mean)
-            xscores <- tapply(x$xscores, list(x$time, treatment, subject), mean)
-            for (i in seq_len(ns)) {
-                if (signature) {
-                    plot(freq, x$ycoef[i,],xlab=xlab,ylab=ylab,type='l', col = col[1], lty = lty[1], ...)
+            if (signature) {
+                for (i in seq_len(ns)) {
+                    plot(freq, x$ycoef[,i],xlab=xlab,ylab=ylab,type='l', col = col[1], lty = lty[1], ...)
                     title(ifelse(missing(main), paste('Signature for Subject',ls[i]),
                                  paste(main,ls[i])))
                 }
-                else if (fitted) {
+            }
+            if (fitted) {
+                yscores <- tapply(x$yscores, list(x$time, treatment, subject), mean)
+                xscores <- tapply(x$xscores, list(x$time, treatment, subject), mean)
+                for (i in seq_len(ns)) {
                     matplot(names(yscores[, 1, i]), yscores[, , i], col = col, type = "p", pch = pch,
                             xlab = xlab,  ylab = xlab, cex = 0.6, ...)
                     matlines(names(xscores[, 1, i]), xscores[, , i], col = col, type = "l", lty = lty)
