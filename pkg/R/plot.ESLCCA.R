@@ -5,6 +5,12 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
                         space = "bottom", corner = NULL, columns = 2, ...){
     ## control over legend and title?
     subject <- x$subject
+    one <- FALSE
+    if (is.null(subject)) {
+        lattice <- overlay <- FALSE
+        individual <- one <- TRUE
+        subject <- factor(rep.int(1, length(x$xscores)))
+    }
     ns <- nlevels(subject)
     ls <- levels(subject)
 
@@ -26,24 +32,20 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
         freq <- seq_len(nrow(x$ycoef))
 
     treatment <- series
-    if (is.null(treatment)) {
-        if (fitted) {
-            equal <- function(x){
-                if (length(x) > 1) isTRUE(do.call(all.equal, as.list(x)))
-                else TRUE
-            }
-            different <- !all(tapply(x$xscores, list(x$time), equal))
-            if (different)
-                stop("Different fitted values found for same time point - \n",
-                     "specify 'series' to separate different series.")
-        }
-        treatment <- factor(rep.int(1, length(x$xscores)))
-    }
     nt <- nlevels(treatment)
     lt <- levels(treatment)
+    if (is.null(treatment)) {
+        ## create factor to id series
+        time <- as.numeric(paste(unclass(subject), x$time, sep = ""))
+        ord <- order(time)
+        reps <- table(time)
+        treatment <- factor(sequence(reps)[order(ord)])
+        nt <- 1
+    }
 
     if (missing(xlab)) xlab <- ifelse(signature, "Frequency", "Time")
     if (missing(ylab)) ylab <- ifelse(signature, "Coefficient", "Score")
+
     if (missing(col)) {
         if (exists("rainbow_hcl", mode= "function"))
             col <- c(hex(polarLUV(H = 0, C = 0, L = 60)), rainbow_hcl(ifelse(signature, ns - 1, nt - 1), c = 100, l = 60)) # assumes ref
@@ -63,7 +65,7 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
                        lty = lty, pch = NULL, merge = TRUE)
             }
             else if (fitted) { #show fitted curves only else plot too noisy
-                fit <- tapply(x$xscores, list(x$time, interaction(subject, treatment)))
+                fit <- tapply(x$xscores, list(x$time, interaction(subject, treatment)), I)
                 matplot(names(fit[, 1]), fit[,-1], col = col, type = "l", lty = lty, pch = pch,
                         xlab= xlab, ylab= ylab, ...)
                 title(ifelse(missing(main), 'Fitted Values Corresponding to Different Subjects', main))
@@ -87,7 +89,11 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
                     key <- list(space = space, corner = corner, lines = list(col = col, lty = lty,  pch = pch),
                                 type = "b", text = list(lt), border = TRUE, columns = columns)
                 }
-                else key <- NULL
+                else {
+                    key <- NULL
+                    pch <- rep(pch[1], nlevels(treatment))
+                    col <- rep(col[1], nlevels(treatment))
+                }
                 print(xyplot(x$xscores ~ x$time | subject, group=treatment, type=c("l"), col = col, lty = lty,
                              main = ifelse(missing(main), 'Fitted Values Corresponding to Different Subjects', main),
                              xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ...))
@@ -95,9 +101,10 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
                 nc <- ncol(layout)
                 for (i in seq_len(ns)) {
                     trellis.focus("panel", column = (i - 1) %% nc + 1, row = (i - 1) %/% nc + 1)
-                    id <- subject == ls[i]
-                    panel.points(x$time[id], x$yscores[id], col = col[treatment[id]],
-                                 pch = pch[treatment[id]], cex = 0.6)
+                    id1 <- subject == ls[i]
+					id2 <- unclass(as.factor(treatment))[id1]
+                    panel.points(x$time[id1], x$yscores[id1], col = col[id2],
+                                 pch = pch[id2], cex = 0.6)
                     trellis.unfocus()
                 }
             }
@@ -106,18 +113,18 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
             if (signature) {
                 for (i in seq_len(ns)) {
                     plot(freq, x$ycoef[,i],xlab=xlab,ylab=ylab,type='l', col = col[1], lty = lty[1], ...)
-                    title(ifelse(missing(main), paste('Signature for Subject',ls[i]),
+                    title(ifelse(missing(main), ifelse(one, 'Signature', paste('Signature for Subject',ls[i])),
                                  paste(main,ls[i])))
                 }
             }
             if (fitted) {
-                yscores <- tapply(x$yscores, list(x$time, treatment, subject), mean)
-                xscores <- tapply(x$xscores, list(x$time, treatment, subject), mean)
+                yscores <- tapply(x$yscores, list(x$time, treatment, subject), I)
+                xscores <- tapply(x$xscores, list(x$time, treatment, subject), I)
                 for (i in seq_len(ns)) {
                     matplot(names(yscores[, 1, i]), yscores[, , i], col = col, type = "p", pch = pch,
                             xlab = xlab,  ylab = xlab, cex = 0.6, ...)
                     matlines(names(xscores[, 1, i]), xscores[, , i], col = col, type = "l", lty = lty)
-                    title(ifelse(missing(main), paste('Fitted Values for Subject',ls[i]),
+                    title(ifelse(missing(main), ifelse(one, 'Fitted Values', paste('Fitted Values for Subject',ls[i])),
                                  paste(main,ls[i])))
                     if (nt > 1) {
                         legend(x = legend.x, y=NULL, legend = lt, col = col,
@@ -129,14 +136,14 @@ plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual 
     }
     else {
         if (signature) {
-            plot(colMeans(x$ycoef),xlab=xlab, ylab = ylab, type='l', col = col[1], lty = lty[1], ...)
-            title(ifelse(missing(main), ifelse(ns, 'Mean Signature', 'Signature'), main))
+            plot(rowMeans(x$ycoef),xlab=xlab, ylab = ylab, type='l', col = col[1], lty = lty[1], ...)
+            title(ifelse(missing(main), 'Mean Signature', main))
         }
         else if (fitted) {
-            xscores <- tapply(x$xscores, list(x$time, treatment), mean)
-            matplot(names(xscores[, 1]), xscores[,-1], col = col, type = "l", lty = lty,
+            xscores <- tapply(x$xscores, list(x$time, treatment), I)
+            matplot(rownames(xscores), xscores, col = col, type = "l", lty = lty,
                     xlab = xlab,  ylab = ylab, ...)
-            title(ifelse(missing(main), ifelse(ns, 'Mean Fitted Values', 'Mean Fitted Values'), main))
+            title(ifelse(missing(main), 'Mean Fitted Values', main))
             if (nt > 1) {
                 legend(x = legend.x,y=NULL, legend = lt, col = col, lty = lty,
                        pch = NULL, merge = TRUE)

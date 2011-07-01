@@ -1,12 +1,13 @@
 ESLCCA <- function (Y, # matrix of power spectra
-                    time, # time points
                     formula = "Double Exponential", # use built-in for now, implement formula later
+                    time, # time points
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
                     treatment = NULL, # treatment factor (allow NULL => single curve?)
                     ref = 1, # reference level (allow NULL => no control?)
                     separate = TRUE, #fit separate nonlinear parameters for each treatment?
                     partial = ~1,
                     data = NULL,
+                    subset = NULL,
                     global.smooth = FALSE,
                     subject.smooth = TRUE,
                     start = NULL,
@@ -18,11 +19,11 @@ ESLCCA <- function (Y, # matrix of power spectra
         if (!length(formula)) stop("\"formula\" not recognised, only \"Double Exponential\" or \"Critical Exponential\" \n",
                                    "can be specified as character strings")
         start <- switch(formula, #replicate later for multiple treatments
-                        "Double Exponential" = list(K1 = 8.5, K2 = 9),
+                        "Double Exponential" = list(K1 = 9, K2 = 8.5), #K1 > K2 so increases from ref
                         "Critical Exponential" = list(K1 = 8.5))
         formula <- switch(formula,
-                          "Double Exponential" = ~ (abs(K1-K2)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
-                              (abs(K1-K2)<=10e-6)*(time*exp(-time/exp(K1))) ,
+                          "Double Exponential" = ~ (abs(K2-K1)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
+                              (abs(K2-K1)<=10e-6)*(time*exp(-time/exp(K1))) ,
                           "Critical Exponential" = ~ time*exp(-time/exp(K1)))
     }
 
@@ -37,7 +38,7 @@ ESLCCA <- function (Y, # matrix of power spectra
     ## Collate data to ensure equal length and deal with NAs across all variables
     ## get model frame including Y, time, subject & treatment if specified, omit NAs
     mf <- match.call(expand.dots = FALSE)
-    m <- match(c("subject", "treatment", "time", "data"), names(mf), 0L)
+    m <- match(c("subject", "treatment", "time", "data", "subset"), names(mf), 0L)
     mf <- mf[c(1L, m)]
     mf$formula <- dummy
     mf$na.action <- na.omit
@@ -84,10 +85,10 @@ ESLCCA <- function (Y, # matrix of power spectra
             global.smooth=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
         }
         SVD = svd( Y, nu=global.smooth, nv=global.smooth )
-        Y = SVD$u%*%diag(SVD$d[1:global.smooth],ncol=global.smooth)%*%t(SVD$v)
+        Y = SVD$u%*% (SVD$d[1:global.smooth] * t(SVD$v))
     }
 
-    if (subject.smooth == TRUE) {
+    if (isTRUE(subject.smooth)) {
         ## Automatically select number of roots
         subject.smooth <- numeric(nind)
         for (i in seq_len(nind)) {
@@ -140,7 +141,7 @@ ESLCCA <- function (Y, # matrix of power spectra
         nr=nrow(Yr)
         if (subject.smooth) {
             SVD = svd( Yr, nu=subject.smooth, nv=subject.smooth )
-            Yr = SVD$u%*%tcrossprod(x=diag(SVD$d[1:subject.smooth]),y=SVD$v)
+            Yr = SVD$u %*% (SVD$d[1:subject.smooth] * t(SVD$v))
         }
         ## Calculate the idempotent matrix R
         if (is.empty.model(partial)){
@@ -162,7 +163,7 @@ ESLCCA <- function (Y, # matrix of power spectra
         S11.eig <- eigen(S11)
         S11.val=suppressWarnings(sqrt(S11.eig$values))
         S11.val[is.na(S11.val)]=0
-        S11.sqrt <- solve(S11.eig$vectors %*% tcrossprod(diag(S11.val,ncol=length(S11.val)),S11.eig$vectors) )
+        S11.sqrt <- solve(S11.eig$vectors %*% (S11.val * t(S11.eig$vectors)))
         if (!is.null(treatment)) {
             include <-  treatment[ind[[i]]] != ref #can ignore reference level when finding nonlin par
             id <- unclass(factor(treatment[ind[[i]]][include]))
@@ -170,7 +171,6 @@ ESLCCA <- function (Y, # matrix of power spectra
             dat <- mf[ind[[i]][include], , drop = FALSE]
             F <- class.ind(id)
             if (!separate) id <- 1
-            #F <- matrix(1, nrow = nrow(F), ncol = 1) # hack so separate = TRUE => sep nonlin par, but same lin par
         }
         else {
             dat <- mf[ind[[i]], , drop = FALSE]
@@ -214,12 +214,17 @@ ESLCCA <- function (Y, # matrix of power spectra
         xscores[ind[[i]]] = x.list[[i]]%*%B
         if (!is.empty.model(partial)) {
             x.list[[i]]=cbind(x.list[[i]],G)
-            lin <- lm.fit(G, yscores[ind[[i]]]/cor[i] - xscores[ind[[i]]])
+            lin <- lm.fit(G, yscores[ind[[i]]] - xscores[ind[[i]]])
             xcoef[,i] <- c(B, lin$coef)
             xscores[ind[[i]]] = xscores[ind[[i]]] + fitted(lin)
         }
         else xcoef[,i] <- B
-        if (cor(yscores[ind[[i]]], rowSums(y.list[[i]])) < 0) {
+        par <- split(unlist(start), group)
+        dat[nm] <- lapply(par, "[", id)
+        val <- eval(formula, dat)
+        Fr <- val*F
+        RFr <- R %*% Fr
+        if (cor(xscores[ind[[i]]], rowSums(RFr)) < 0) {
             xcoef[,i] <- -xcoef[,i]
             xscores[ind[[i]]] <- -xscores[ind[[i]]]
             ycoef[,i] <- -ycoef[,i]

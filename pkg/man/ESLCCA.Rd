@@ -131,8 +131,6 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
 \author{ Foteini Strimenopoulou and Heather Turner }
 \seealso{ \code{\link{plot.ESLCCA}}}
 \examples{
-
+data(clonidine)
 }
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory.
 \keyword{ multivariate }
