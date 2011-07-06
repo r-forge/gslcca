@@ -1,4 +1,4 @@
-compareSmooth <- function(x, plot = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
+plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
                           ask = dev.interactive(), main = NULL, xlab = NULL, ylab = NULL,
                           col = NULL, lty = NULL, pch = NULL,
                           space = "bottom", corner = NULL, columns = 2, ...){

@@ -1,5 +1,5 @@
-varySmooth <- function(x, subject.smooth = NULL, ...){
-    if(!inherits(x, "ESLCCA")) stop("'x' must be an \"ESLCCA\" object")
+smooth <- function(x, subject.smooth = NULL, ...){
+    if(!inherits(x, "gslcca")) stop("'x' must be an \"gslcca\" object")
 
     if (is.null(subject.smooth)) subject.smooth <- seq_len(ncol(x$ycoef)/2)
 
@@ -8,11 +8,11 @@ varySmooth <- function(x, subject.smooth = NULL, ...){
     for (r in subject.smooth) {
         if (r == x$subject.roots) res[[as.character(r)]] <- x
         else {
-            cat("Re-running ESLCCA with subject.smooth =", r, "\n")
+            cat("Re-running gslcca with subject.smooth =", r, "\n")
             res[[as.character(r)]] <- update(x, subject.smooth = r)
         }
     }
 
-    attributes(res) <- list(subject.smooth = subject.smooth, class = "varySmooth")
+    attributes(res) <- list(subject.smooth = subject.smooth, class = "smooth.gslcca")
     res
 }

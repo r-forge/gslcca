@@ -1,4 +1,4 @@
-plot.ESLCCA <- function(x, type = "signature", series = x$treatment, individual = TRUE,
+plot.gslcca <- function(x, type = "signature", series = x$treatment, individual = TRUE,
                         overlay = FALSE, ask = dev.interactive(), lattice = FALSE,
                         main = NULL, xlab = NULL, ylab = NULL,
                         col = NULL, lty = NULL, pch = NULL, legend.x = "topright",

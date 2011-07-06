@@ -1,9 +1,9 @@
-\name{ESLCCA-package}
-\alias{ESLCCA-package}
+\name{gslcca-package}
+\alias{gslcca-package}
 \docType{package}
 \title{ Extended Semi-Linear Canonical Correlation Analysis }
 \description{
-ESLCCA estimates the parameters of a given nonlinear pharmaocometric  model to maximize the correlation with a linear combination of the multiple response variables (in this case, the power spectra). 
+gslcca estimates the parameters of a given nonlinear pharmaocometric  model to maximize the correlation with a linear combination of the multiple response variables (in this case, the power spectra). 
 }
 \details{
  This method can be used to characterize brain activity under different treatment regimens in research and development projects at Pfizer.
@@ -21,7 +21,7 @@ Maintainer: Foteini Strimenopoulou <Foteini.Strimenopoulou@pfizer.com>
 
 \keyword{ package }
 \seealso{
-\code{\link{ESLCCA}} ~~
+\code{\link{gslcca}} ~~
 }
 \examples{
 }

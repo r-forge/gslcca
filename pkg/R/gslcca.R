@@ -1,4 +1,4 @@
-ESLCCA <- function (Y, # matrix of power spectra
+gslcca <- function (Y, # matrix of power spectra
                     formula = "Double Exponential", # use built-in for now, implement formula later
                     time, # time points
                     subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
@@ -264,7 +264,7 @@ ESLCCA <- function (Y, # matrix of power spectra
                 global.roots = global.smooth,
                 subject.roots = subject.smooth,
                 opt = opt)
-    class(out) <- "ESLCCA"
+    class(out) <- "gslcca"
     out
 }
 
