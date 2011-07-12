@@ -43,7 +43,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment, individual 
         nt <- 1
     }
 
-    if (missing(xlab)) xlab <- ifelse(signature, "Frequency", "Time")
+    if (missing(xlab)) xlab <- ifelse(signature, "Frequency (Hz)", "Time")
     if (missing(ylab)) ylab <- ifelse(signature, "Coefficient", "Score")
 
     if (missing(col)) {
@@ -59,7 +59,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment, individual 
     if (individual) {
         if (overlay) {
             if (signature) {
-                matplot(freq, x$ycoef, col=col,type='l', xlab= xlab, ylab= ylab, ...)
+                matplot(freq, x$ycoef, col=col,type='l', xlab= xlab, ylab= ylab, lty = lty, ...)
                 title(ifelse(missing(main), 'Signatures Corresponding to Different Subjects', main))
                 legend(x = legend.x,y=NULL, legend = paste('Subject',ls), col = col,
                        lty = lty, pch = NULL, merge = TRUE)
@@ -94,9 +94,10 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment, individual 
                     pch <- rep(pch[1], nlevels(treatment))
                     col <- rep(col[1], nlevels(treatment))
                 }
+                ylim <- range(c(x$xscores, x$yscores))
                 print(xyplot(x$xscores ~ x$time | subject, group=treatment, type=c("l"), col = col, lty = lty,
                              main = ifelse(missing(main), 'Fitted Values Corresponding to Different Subjects', main),
-                             xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ...))
+                             xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ylim = ylim + diff(ylim)/20*c(-1, 1), ...))
                 layout <- trellis.currentLayout()
                 nc <- ncol(layout)
                 for (i in seq_len(ns)) {

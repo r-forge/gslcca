@@ -1,4 +1,4 @@
-smooth <- function(x, subject.smooth = NULL, ...){
+varySmooth <- function(x, subject.smooth = NULL, ...){
     if(!inherits(x, "gslcca")) stop("'x' must be an \"gslcca\" object")
 
     if (is.null(subject.smooth)) subject.smooth <- seq_len(ncol(x$ycoef)/2)
@@ -13,6 +13,6 @@ smooth <- function(x, subject.smooth = NULL, ...){
         }
     }
 
-    attributes(res) <- list(subject.smooth = subject.smooth, class = "smooth.gslcca")
+    attributes(res) <- list(subject.smooth = subject.smooth, class = "varySmooth")
     res
 }

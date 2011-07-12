@@ -1,9 +1,8 @@
-export(gslcca)
+export(gslcca, varySmooth)
 
 import(colorspace) #rainbow_hcl, hex, polarLUV
 import(lattice) # xyplot, trellis.[un]focus, trellis.currentLayout
 
-importFrom(reshape, cast)
 importFrom(nnet, class.ind)
 
 #S3method(formula, gslcca)
@@ -12,5 +11,5 @@ S3method(plot, gslcca)
 S3method(print, gslcca)
 S3method(summary, gslcca)
 
-
+S3method(plot, varySmooth)
 

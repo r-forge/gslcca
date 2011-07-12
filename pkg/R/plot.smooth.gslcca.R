@@ -1,7 +1,7 @@
-plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
-                          ask = dev.interactive(), main = NULL, xlab = NULL, ylab = NULL,
-                          col = NULL, lty = NULL, pch = NULL,
-                          space = "bottom", corner = NULL, columns = 2, ...){
+plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
+                            ask = dev.interactive(), main = NULL, xlab = NULL, ylab = NULL,
+                            col = NULL, lty = NULL, pch = NULL,
+                            space = "bottom", corner = NULL, columns = 2, ...){
     if(!inherits(x, "varySmooth")) stop("'x' must be an object of class \"varySmooth\"")
 
     subject.smooth <- attr(x, "subject.smooth")
@@ -22,21 +22,21 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
         nt <- 1
     }
 
-    if (length(agrep("opt", plot))) plot <- "opt"
-    else if (length(agrep("fitted", plot))) plot <- "fitted"
-    else if (length(agrep("signature", plot))) plot <- "signature"
-    else stop("'plot' not one of recognised options: \"opt\", \"fitted\" or \"signature\"")
+    if (length(agrep("opt", type))) type <- "opt"
+    else if (length(agrep("fitted", type))) type <- "fitted"
+    else if (length(agrep("signature", type))) type <- "signature"
+    else stop("'type' not one of recognised options: \"opt\", \"fitted\" or \"signature\"")
 
     ## sort colours and lines
-    if (missing(xlab)) xlab <- switch(plot,
-                                      signature = "Frequency",
+    if (missing(xlab)) xlab <- switch(type,
+                                      signature = "Frequency (Hz)",
                                       fitted = "Time",
                                       opt = "Roots")
-    if (missing(ylab)) ylab <- switch(plot,
+    if (missing(ylab)) ylab <- switch(type,
                                       signature = "Coefficient",
                                       fitted = "Score",
                                       opt = expression(Log(1 - R^2)))
-    n <- ifelse(plot == "signature", ns, nt)
+    n <- ifelse(type == "signature", ns, nt)
     if (missing(col)) {
         if (exists("rainbow_hcl", mode= "function"))
             col <- c(hex(polarLUV(H = 0, C = 0, L = 60)), rainbow_hcl(n - 1, c = 100, l = 60)) # assumes ref
@@ -47,7 +47,7 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
     if (missing(pch)) pch <- seq_len(n)
 
 
-    if (plot == "opt") {
+    if (type == "opt") {
         opt <- lapply(x, function(x) sapply(x$opt, "[[", "value"))
         roots <- rep(subject.smooth, each = length(opt[[1]]))
         if (!is.null(x[[1]]$subject)){
@@ -60,7 +60,7 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
                      ylab = expression(Log(1 - R^2)), as.table = TRUE, ylim = c(miny + miny/20, 0), ...))
     }
 
-    if (plot == "fitted") {
+    if (type == "fitted") {
         ##need to do separately for each subject
         if (is.null(subject)) subject <- levels(subj)
         else if (any(!subject %in% levels(subj)))
@@ -89,16 +89,17 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
             }
             if (ask) devAskNewPage(TRUE)
             ylim <- range(c(xscores, yscores))
+            browser()
             print(xyplot(c(xscores) ~ time | roots, group = trt, type = "l", col = col,
                          lty = lty, main = ifelse(missing(main), main0, main), ylim = ylim + diff(ylim)/20*c(-1, 1),
-                         xlab = "Time",  ylab = "Score", as.table = TRUE, ...))
+                         xlab = "Time",  ylab = "Score", as.table = TRUE, key = key, ...))
             devAskNewPage(FALSE)
             layout <- trellis.currentLayout()
             nc <- ncol(layout)
             for (i in seq_len(nr)) {
                 trellis.focus("panel", column = (i - 1) %% nc + 1, row = (i - 1) %/% nc + 1)
                 id1 <- roots == subject.smooth[i]
-				id2 <- unclass(as.factor(treatment))[id1]
+                id2 <- unclass(as.factor(trt[id1]))
                 panel.points(time[id1], yscores[id1], col = col[id2],
                              pch = pch[id2], cex = 0.6)
                 trellis.unfocus()
@@ -106,7 +107,7 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
         }
     }
 
-    if (plot == "signature") {
+    if (type == "signature") {
         ycoef <- lapply(x, "[[", "ycoef")
         nf <- nrow(ycoef[[1]])
         freq <- rep(seq_len(nf), ns * nr)
@@ -116,12 +117,11 @@ plot.smooth.gslcca <- function(x, plot = "opt", series = x[[1]]$treatment, subje
         else subj <- NULL
         if (ns > 1) {
             key <- list(space = space, corner = corner, lines = list(col = col, lty = lty),
-                        type = "b", text = list(levels(subj)), border = TRUE, columns = columns)
+                        type = "l", text = list(levels(subj)), border = TRUE, columns = columns)
         }
         else key <- NULL
-        xyplot(unlist(ycoef) ~ freq | roots, group=subj, type=c("l"),
+        xyplot(unlist(ycoef) ~ freq | roots, group=subj, type="l",
                main = ifelse(missing(main), 'Signature by Number of Roots', main),
-               col = col, lty = lty,
-               xlab = 'Frequency',  ylab = 'Coefficient', as.table = TRUE, ...)
+               col = col, lty = lty, xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ...)
     }
 }

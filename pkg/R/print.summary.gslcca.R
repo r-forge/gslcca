@@ -16,9 +16,12 @@ print.summary.gslcca <- function(x, digits = max(3, getOption("digits") - 3), ..
     cat("\nNonlinear parameters:\n")
     print(format(x$nonlinear.parameters, digits = digits))
 
-    cat(ifelse(ns != 1, "\nMean signature:\n", "\nSignature:\n"))
-    print.default(format(x$mean.signature, digits = digits), quote = FALSE)
+    cat("\nLog(1 - R^2) at final iteration:\n")
+    print(format(x$opt.value, digits = digits), quote = FALSE)
 
-    cat(ifelse(ns != 1, "\nMean fitted values:\n", "\nFitted values:\n"))
-    print(format(x$mean.fitted, digits = digits), quote = FALSE)
+    cat("\nNumber of iterations:\n")
+    print(format(x$opt.iter, digits = digits), quote = FALSE)
+
+    cat("\nConvergence indicator (0 = converged, 1 = no converged):\n")
+    print(format(x$opt.conv, digits = digits), quote = FALSE)
 }

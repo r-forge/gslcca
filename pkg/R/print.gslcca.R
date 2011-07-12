@@ -6,7 +6,7 @@ print.gslcca <- function(x, digits = max(3, getOption("digits") - 3), ...){
 
     ns <- ncol(x$ycoef)
     if (ns != 1) {
-        cat("gslcca based on", ns, "subjects\n")
+        cat("GSLCCA based on", ns, "subjects\n")
         if (x$subject.roots != 0) {
             cat("\nData smoothed separately for each subject using", x$subject.roots,
                 "roots\n")

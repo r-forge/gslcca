@@ -18,9 +18,10 @@ gslcca <- function (Y, # matrix of power spectra
         formula <- models[agrep(formula, models)]
         if (!length(formula)) stop("\"formula\" not recognised, only \"Double Exponential\" or \"Critical Exponential\" \n",
                                    "can be specified as character strings")
-        start <- switch(formula, #replicate later for multiple treatments
-                        "Double Exponential" = list(K1 = 9, K2 = 8.5), #K1 > K2 so increases from ref
-                        "Critical Exponential" = list(K1 = 8.5))
+        if (is.null(start))
+            start <- switch(formula, #replicate later for multiple treatments
+                            "Double Exponential" = list(K1 = 9, K2 = 8.5), #K1 > K2 so increases from ref
+                            "Critical Exponential" = list(K1 = 8.5))
         formula <- switch(formula,
                           "Double Exponential" = ~ (abs(K2-K1)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
                               (abs(K2-K1)<=10e-6)*(time*exp(-time/exp(K1))) ,
@@ -121,7 +122,7 @@ gslcca <- function (Y, # matrix of power spectra
     val <- eval(formula, dat)
     mt <- terms(partial)
     if (!is.empty.model(partial)) {
-        G <- model.matrix(mt, mf[1,]) #temp value to find number of parameters associated with covariates
+        G <- model.matrix(mt, mf[1,, drop = FALSE]) #temp value to find number of parameters associated with covariates
         np <- ncol(G)
     }
     else np <- 0
@@ -234,7 +235,8 @@ gslcca <- function (Y, # matrix of power spectra
 
     if (!is.null(treatment)) treatment_c <- paste("", setdiff(levels(treatment), ref))
     else treatment_c <- ""
-    rownames(nonlin.par)= paste(rep(names(start),rep(reps,nPar)),rep(ifelse(separate, treatment_c, ""),nPar), sep = "")
+    if (separate) rownames(nonlin.par) = paste(group, treatment_c, sep = "")
+    else rownames(nonlin.par) = group
 
     if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
     else rownames(xcoef)=paste('formula', treatment_c)

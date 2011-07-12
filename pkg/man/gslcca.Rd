@@ -1,6 +1,6 @@
-\name{ESLCCA}
-\alias{ESLCCA}
-\title{ ESLCCA }
+\name{gslcca}
+\alias{gslcca}
+\title{ gslcca }
 \description{
   Performs (Extended) Semi Linear Canonical Correlation Analysis,
   i.e. computes the canonical correlation between a data matrix and a 
@@ -9,17 +9,17 @@
   Shortcuts are provided for PK/PD models suitable for analysing EEG data.
 }
 \usage{
-ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
-    treatment = NULL, ref = 1, partial = ~1, data, na.action,
-    global.smooth = FALSE, subject.smooth = TRUE, start = NULL)
+gslcca(Y, formula = "Double Exponential", time, subject = NULL,
+    treatment = NULL, ref = 1, separate = TRUE, partial = ~1, data, subset,
+    global.smooth = FALSE, subject.smooth = TRUE, start = NULL, ...)
 }
 \arguments{
   \item{Y}{ a data matrix. }
-  \item{time}{ a vector of time values corresponding to the rows of \code{Y}. }
   \item{formula}{ either a nonlinear model formula specifying a function
     of \code{time} including parameters, or one of the character strings
     \code{"Double Exponential"} or \code{"Critical Exponential"} to specify the
     corresponding PK/PD model (see Details). }
+  \item{time}{ a vector of time values corresponding to the rows of \code{Y}. }
   \item{subject}{ an optional factor grouping the rows of Y. If
     specified, data corresponding to to each level will be analysed
     separately (after any smoothing specified by
@@ -29,10 +29,12 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
     \code{formula} should be estimated. }
   \item{ref}{ the reference level of \code{treatment} for
     which \code{formula} is set to \code{~ 0} (may be \code{NULL}). }
+  \item{separate}{ }
   \item{partial}{ a linear model formula specifying covariates to
     partial out of the CCA analysis (may be \code{NULL}).}
   \item{data}{ an optional data frame in which to evaluate the variables
     in \code{time}, \code{subject}, \code{treatment} and \code{partial}. }
+  \item{subset}{}
   \item{global.smooth}{ controls the smoothing of \code{Y} via SVD. Must
     be one of \code{FALSE} for no smoothing, \code{TRUE} for smoothing
     with an automatically selected number of roots, or a scalar specifying the
@@ -102,11 +104,11 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
   can be thought of as the (projected) observed and fitted values.
   
   Both signatures and fitted values can be visualised using
-  \code{\link{plot.ESLCCA}}. 
+  \code{\link{plot.gslcca}}. 
 }
 \value{
-  An object of class \code{"ESLCCA"}, which is a list with components
-  \item{call}{ the call to \code{ESLCCA}.  }
+  An object of class \code{"gslcca"}, which is a list with components
+  \item{call}{ the call to \code{gslcca}.  }
   \item{ycoef}{ a data frame giving the coefficients of the left-hand
     side matrix for each subject.  }
   \item{xcoef}{  a data frame giving the coefficients of the right-hand
@@ -129,7 +131,7 @@ ESLCCA(Y, time, formula = "Double Exponential", subject = NULL,
   electroencephalogram (EEG) data using Extended Semi-Linear Canonical
   Correlation Analysis.  Submitted. }
 \author{ Foteini Strimenopoulou and Heather Turner }
-\seealso{ \code{\link{plot.ESLCCA}}}
+\seealso{ \code{\link{plot.gslcca}}}
 \examples{
 data(clonidine)
 }
