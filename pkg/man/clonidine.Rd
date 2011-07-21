@@ -12,19 +12,16 @@ medium, or high) and vehicle.
 }
 \usage{data(clonidine)}
 \format{
-  A list of two components
+  A list of two components: \code{spectra}, a matrix of mean power
+  spectra and \code{design}, a data frame of variables specifying the
+  design point corresponding to each spectrum, specifically:
   \describe{
-    \item{spectra}{ a matrix of mean power spectra, see Details. }
-    \item{design}{ a data frame of variables specifying the design point
-    corresponding to each spectrum }
-    \describe{
-      \item{Rat}{ a factor with two levels: "41" and "42". }
-      \item{Treatment}{ a factor with four levels: "Control", "Low Dose",
+    \item{Rat}{ a factor with two levels: "41" and "42". }
+    \item{Treatment}{ a factor with four levels: "Control", "Low Dose",
       "Middle Dose", "High Dose". }
-      \item{From}{ a variable giving the time in seconds at the start of
+    \item{Time}{ a variable giving the time in seconds at the start of
       the five minute time interval over which the mean spectra was
       calculated. }
-    }
   }
 }
 \details{
@@ -50,24 +47,26 @@ remaining spectra were averaged over five minute time intervals (so up
 to 25 spectra were averaged) to give the final set of mean spectra.
 }
 \source{
-Original data produced by Pfizer Global R \& D, UK.
+Original data produced by Pfizer Global R & D, UK.
 }
 \examples{
 data(clonidine)
+
+attach(clonidine)
 
 ######################
 ## Example periodogram
 ######################
 
-eg <- with(clonidine$design, { 
-           list(Rat == "42" & From == 0 & Treatment == "Control",
-                Rat == "42" & From == 8400 & Treatment == "Control")
+eg <- with(design, { 
+           list(Rat == "42" & Time == 0 & Treatment == "Control",
+                Rat == "42" & Time == 8400 & Treatment == "Control")
            })
 
-plot(1:36, clonidine$spectra[eg[[2]]], type = "l", ylab =
+plot(1:36, spectra[eg[[2]]], type = "l", ylab =
     expression(paste("Power (", mu, V^2, ")")), lty = 2,
     xlab = "Frequency (Hz)", main = "Examples of frequency periodograms")
-lines(1:36, clonidine$spectra[eg[[1]]], lty = 1)
+lines(1:36, spectra[eg[[1]]], lty = 1)
 legend("topright", c("0-300 seconds", "8400-8700 seconds"), lty = 1:2)
 
 #######################################################################
@@ -76,9 +75,9 @@ legend("topright", c("0-300 seconds", "8400-8700 seconds"), lty = 1:2)
 #######################################################################
 
 ### Unsmoothed data
-result <- gslcca(clonidine$spectra, "Critical Exponential",
-    time = From, treatment = Treatment, subject.smooth = FALSE,
-    data = clonidine$design, subset = Rat == "42")
+result <- gslcca(spectra, "Critical Exponential",
+    time = Time, treatment = Treatment, subject.smooth = FALSE,
+    data = design, subset = Rat == "42")
 
 ## drug signature
 plot(result, "signature")
@@ -87,9 +86,9 @@ plot(result, "signature")
 plot(result, "fitted")
 
 ### Smoothed data - automatically select number of roots
-result <- gslcca(clonidine$spectra, "Critical Exponential",
-    time = From, treatment = Treatment, subject.smooth = TRUE,
-    data = clonidine$design, subset = Rat == "42")
+result <- gslcca(spectra, "Critical Exponential",
+    time = Time, treatment = Treatment, subject.smooth = TRUE,
+    data = design, subset = Rat == "42")
 
 ## drug signature
 plot(result, "signature")

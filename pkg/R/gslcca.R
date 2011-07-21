@@ -1,10 +1,10 @@
 gslcca <- function (Y, # matrix of power spectra
-                    formula = "Double Exponential", # use built-in for now, implement formula later
+                    formula = "Double Exponential",
                     time, # time points
-                    subject = NULL, # subject indicator (allow NULL => no subjects/treat the same?)
-                    treatment = NULL, # treatment factor (allow NULL => single curve?)
-                    ref = 1, # reference level (allow NULL => no control?)
-                    separate = TRUE, #fit separate nonlinear parameters for each treatment?
+                    subject = NULL, 
+                    treatment = NULL,
+                    ref = 1, 
+                    separate = TRUE, 
                     partial = ~1,
                     data = NULL,
                     subset = NULL,
@@ -16,11 +16,14 @@ gslcca <- function (Y, # matrix of power spectra
     if (is.character(formula)){
         models <- c("Double Exponential", "Critical Exponential")
         formula <- models[agrep(formula, models)]
-        if (!length(formula)) stop("\"formula\" not recognised, only \"Double Exponential\" or \"Critical Exponential\" \n",
-                                   "can be specified as character strings")
+        if (!length(formula)) 
+            stop("\"formula\" not recognised, only \"Double Exponential\"", 
+                 "or \"Critical Exponential\" \n",
+                "can be specified as character strings")
         if (is.null(start))
             start <- switch(formula, #replicate later for multiple treatments
-                            "Double Exponential" = list(K1 = 9, K2 = 8.5), #K1 > K2 so increases from ref
+                            #K1 > K2 so increases from ref
+                            "Double Exponential" = list(K1 = 9, K2 = 8.5), 
                             "Critical Exponential" = list(K1 = 8.5))
         formula <- switch(formula,
                           "Double Exponential" = ~ (abs(K2-K1)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
@@ -33,13 +36,14 @@ gslcca <- function (Y, # matrix of power spectra
 
     ## anything without starting values assumed to be a variable
     vars <- setdiff(c(vars, all.vars(partial)), c("time", names(start)))
-    dummy <- reformulate(c("0", vars), response = "Y") #don't need intercept for model frame
+    dummy <- reformulate(c("0", vars), response = "Y") #don't need int for mf
     formula <- as.expression(formula[[length(formula)]])
 
-    ## Collate data to ensure equal length and deal with NAs across all variables
-    ## get model frame including Y, time, subject & treatment if specified, omit NAs
+    ## Collate data to ensure equal length and deal with NAs 
+    ## get model frame inc. Y, time, subject & treatment if specified, omit NAs
     mf <- match.call(expand.dots = FALSE)
-    m <- match(c("subject", "treatment", "time", "data", "subset"), names(mf), 0L)
+    m <- match(c("subject", "treatment", "time", "data", "subset"), 
+               names(mf), 0L)
     mf <- mf[c(1L, m)]
     mf$formula <- dummy
     mf$na.action <- na.omit
@@ -71,19 +75,22 @@ gslcca <- function (Y, # matrix of power spectra
     }
     else ntrt <- 1
 
-    if (is.null(mf$`(time)`)) stop("'time' must be specified and have length equal to", nr, "\n")
+    if (is.null(mf$`(time)`)) 
+        stop("'time' must be specified and have length equal to", nr, "\n")
     names(mf)[match("(time)", names(mf))] <- "time"
 
     ## take out extras from mf
-    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")), drop = FALSE]
+    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")), 
+             drop = FALSE]
 
     ## Pre-smoothing of the complete data set for artefacts removal
     if (global.smooth) {
         if (global.smooth == TRUE) {
-            Ytemp= scale(Y,scale=F)
+            Ytemp= scale(Y,scale=FALSE)
             eig=eigen(crossprod(Ytemp), only.values = TRUE)$values
             nroots=seq_along(eig)
-            global.smooth=max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98]) + 1
+            global.smooth=max(nroots[(eig/eig[1])>0.001 & 
+                cumsum(eig)/sum(eig)<0.98]) + 1
         }
         SVD = svd( Y, nu=global.smooth, nv=global.smooth )
         Y = SVD$u%*% (SVD$d[1:global.smooth] * t(SVD$v))
@@ -93,24 +100,28 @@ gslcca <- function (Y, # matrix of power spectra
         ## Automatically select number of roots
         subject.smooth <- numeric(nind)
         for (i in seq_len(nind)) {
-            Ytemp = scale(Y[ind[[i]],],scale=F)
+            Ytemp = scale(Y[ind[[i]],],scale=FALSE)
             eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
             nroots = seq_along(eig)
-            subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 & cumsum(eig)/sum(eig)<0.98])
+            subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 &
+                cumsum(eig)/sum(eig)<0.98])
         }
         subject.smooth = max(subject.smooth)+1
     }
 
     reps <- ifelse(separate, ntrt, 1)
     if (is.null(start)) {
-        stop('No initial values have been specified for the nonlinear parameters.')
+        stop('No initial values have been specified for the nonlinear',
+             ' parameters.')
     }
     else {
         start <- mapply(function(start, label, reps) {
             if (length(start) == 1) rep(start, reps)
             else if (length(start) == reps) start
-            else stop("there should be 1 or", reps, "starting values for parameter", label, "\n")
-        }, start = start, label = names(start), MoreArgs = list(reps = reps), SIMPLIFY = FALSE)
+            else stop("there should be 1 or", reps, 
+                      "starting values for parameter", label, "\n")
+        }, start = start, label = names(start), MoreArgs = list(reps = reps),
+                        SIMPLIFY = FALSE)
     }
     nPar <- length(start)
     group <- gl(nPar, reps, labels = names(start))
@@ -238,8 +249,8 @@ gslcca <- function (Y, # matrix of power spectra
     if (separate) rownames(nonlin.par) = paste(group, treatment_c, sep = "")
     else rownames(nonlin.par) = group
 
-    if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
-    else rownames(xcoef)=paste('formula', treatment_c)
+    #if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
+    #else rownames(xcoef)=paste('formula', treatment_c)
 
     ycoef <- as.data.frame(ycoef)
     rownames(ycoef) <- f

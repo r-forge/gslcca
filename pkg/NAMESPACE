@@ -10,6 +10,8 @@ importFrom(nnet, class.ind)
 S3method(plot, gslcca)
 S3method(print, gslcca)
 S3method(summary, gslcca)
+S3method(print, summary.gslcca)
+
 
 S3method(plot, varySmooth)
 

@@ -1,7 +1,7 @@
 \name{plot.gslcca}
 \alias{plot.gslcca}
 \title{
-  Plot Results from an GSLCCA Analysis
+  Plot Results from a GSLCCA Analysis
 }
 \description{
   Plot \sQuote{signatures} (loadings of the \eqn{\mathbf{Y}}{Y} matrix) or (projected)

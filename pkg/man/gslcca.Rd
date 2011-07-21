@@ -1,8 +1,8 @@
 \name{gslcca}
 \alias{gslcca}
-\title{ gslcca }
+\title{ Perform a Generalised Semi Linear Canonical Correlation Analysis }
 \description{
-  Performs (Extended) Semi Linear Canonical Correlation Analysis,
+  Performs (Generalised) Semi Linear Canonical Correlation Analysis,
   i.e. computes the canonical correlation between a data matrix and a 
   nonlinear function of time. SLCCA is extended by allowing parameters
   to vary by a treatment factor and allowing adjustment for covariates.
@@ -25,11 +25,13 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
     separately (after any smoothing specified by
     \code{global.smooth}). }
   \item{treatment}{ an optional factor (nested within \code{subject} if
-    specified) identifying groups for which separate parameters of
-    \code{formula} should be estimated. }
+    specified) identifying groups for which separate parameters
+    should be estimated. }
   \item{ref}{ the reference level of \code{treatment} for
     which \code{formula} is set to \code{~ 0} (may be \code{NULL}). }
-  \item{separate}{ }
+  \item{separate}{ if \code{treatment} is specified, whether to estimate
+    separate parameters of \code{formula} and separate canonical coefficients
+    for each treatment or just separate canonical coefficients. }
   \item{partial}{ a linear model formula specifying covariates to
     partial out of the CCA analysis (may be \code{NULL}).}
   \item{data}{ an optional data frame in which to evaluate the variables
@@ -131,7 +133,7 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
   electroencephalogram (EEG) data using Extended Semi-Linear Canonical
   Correlation Analysis.  Submitted. }
 \author{ Foteini Strimenopoulou and Heather Turner }
-\seealso{ \code{\link{plot.gslcca}}}
+\seealso{ \code{\link{plot.gslcca}}, \code{\link{varySmooth}}}
 \examples{
 data(clonidine)
 }
