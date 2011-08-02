@@ -6,17 +6,17 @@
 }
 \description{
 Power spectra derived from electroencephalogram (EEG) measurements of
-brain activity for two rats from a balanced four-way cross-over design
+brain activity for eight rats from a balanced four-way cross-over design
 experiment in which rats were dosed with three doses of clonidine (low,
 medium, or high) and vehicle.
 }
 \usage{data(clonidine)}
 \format{
-  A list of two components: \code{spectra}, a matrix of mean power
-  spectra and \code{design}, a data frame of variables specifying the
+  The data consist of a matrix named \code{spectra}, containing mean
+  power spectra and \code{design}, a data frame of variables specifying the
   design point corresponding to each spectrum, specifically:
   \describe{
-    \item{Rat}{ a factor with two levels: "41" and "42". }
+    \item{Rat}{ a factor with eight levels: "35", "36", ..., "42". }
     \item{Treatment}{ a factor with four levels: "Control", "Low Dose",
       "Middle Dose", "High Dose". }
     \item{Time}{ a variable giving the time in seconds at the start of
@@ -45,14 +45,16 @@ filtered by removing spectra where power at any frequency was greater
 than 0.1 powers greater than this were regarded as artefacts). The
 remaining spectra were averaged over five minute time intervals (so up
 to 25 spectra were averaged) to give the final set of mean spectra.
+
+To reduce the size of the data set distributed with the package, the
+data have been subsampled, so that every other mean spectra has been
+kept. 
 }
 \source{
 Original data produced by Pfizer Global R & D, UK.
 }
 \examples{
 data(clonidine)
-
-attach(clonidine)
 
 ######################
 ## Example periodogram
@@ -63,7 +65,8 @@ eg <- with(design, {
                 Rat == "42" & Time == 8400 & Treatment == "Control")
            })
 
-plot(1:36, spectra[eg[[2]]], type = "l", ylab =
+freq <- as.numeric(colnames(spectra))
+plot(freq, spectra[eg[[2]]], type = "l", ylab =
     expression(paste("Power (", mu, V^2, ")")), lty = 2,
     xlab = "Frequency (Hz)", main = "Examples of frequency periodograms")
 lines(1:36, spectra[eg[[1]]], lty = 1)

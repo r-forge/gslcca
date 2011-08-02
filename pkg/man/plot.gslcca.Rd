@@ -12,7 +12,7 @@
     \method{plot}{gslcca}(x, type = "signature", series = x$treatment,
         individual = TRUE, overlay = FALSE, ask = dev.interactive(),
         lattice = FALSE, main = NULL, xlab = NULL, ylab = NULL,
-        col = NULL, lty = NULL, pch = NULL, legend.x = "topright",
+        col = NULL, lty = 1, lwd = 1.5, pch = NULL, legend.x = "topright",
         space = "bottom", corner = NULL, columns = 2, ...)
 }
 \arguments{
@@ -40,6 +40,7 @@
     \code{\link{rainbow_hcl}} if available, otherwise the standard
     plotting colours are used. }
   \item{lty}{ a vector of line types, see \code{\link{par}}.}
+  \item{lwd}{ a vector of line widths, see \code{\link{par}}.}
   \item{pch}{ a vector of plotting characters, see \code{\link{points}}.}
   \item{legend.x}{ a character vector to use in the legend.}
   \item{space}{ when \code{type = "fitted"} and \code{lattice = TRUE},
@@ -82,5 +83,49 @@
 \code{\link{gslcca}}
 }
 \examples{
+data(clonidine)
+
+### Separate critical exponential model for each treatment
+result <- gslcca(spectra, "Critical Exponential",
+    time = Time, treatment = Treatment, subject = Rat,
+    subject.smooth = 4, data = design)
+
+## plot of individual signatures
+par(mfrow = c(2, 2))
+plot(result, type = "signature")
+
+## plot of individual projected observed and fitted values
+plot(result, type = "scores")
+
+## plot of individual projected fitted values
+plot(result, type = "fitted")
+
+## plot of individual signatures - overlaid
+par(mfrow = c(1, 1))
+plot(result, type = "signature", overlay = TRUE)
+
+## plot of individual projected fitted values - overlaid
+plot(result, type = "fitted", overlay = TRUE)
+## equivalent to
+## plot(result, type = "scores", overlay = TRUE)
+
+## plot of individual signatures - lattice
+plot(result, type = "signature", lattice = TRUE)
+
+## plot of individual projected observed and fitted values - lattice
+plot(result, type = "scores", lattice = TRUE)
+
+## plot of individual projected fitted values - lattice
+plot(result, type = "fitted", lattice = TRUE)
+
+## plot of mean signature
+par(mfrow = c(1, 1))
+plot(result, type = "signature", mean = TRUE)
+
+## plot of mean fitted
+par(mfrow = c(1, 1))
+plot(result, type = "fitted", mean = TRUE)
+## equivalent to
+## plot(result, type = "scores", overlay = TRUE)
 }
 \keyword{ hplot }

@@ -1,6 +1,6 @@
 plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
                             ask = dev.interactive(), main = NULL, xlab = NULL, ylab = NULL,
-                            col = NULL, lty = NULL, pch = NULL,
+                            col = NULL, lty = 1, lwd = 1.5, pch = NULL,
                             space = "bottom", corner = NULL, columns = 2, ...){
     if(!inherits(x, "varySmooth")) stop("'x' must be an object of class \"varySmooth\"")
 
@@ -43,7 +43,6 @@ plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject 
         else
             col <- seq_len(n)
     }
-    if (missing(lty)) lty <- seq_len(n)
     if (missing(pch)) pch <- seq_len(n)
 
 
@@ -79,7 +78,7 @@ plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject 
             trt <- rep(subset(treatment, subj == s), nr)
             roots <- gl(nr, nrow(xscores), labels = subject.smooth)
             if (nt > 1) {
-                key <- list(space = space, corner = corner, lines = list(col = col, lty = lty,  pch = pch),
+                key <- list(space = space, corner = corner, lines = list(col = col, lty = lty, lwd = lwd,  pch = pch),
                             type = "b", text = list(levels(treatment)), border = TRUE, columns = columns)
             }
             else {
@@ -91,7 +90,7 @@ plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject 
             ylim <- range(c(xscores, yscores))
             browser()
             print(xyplot(c(xscores) ~ time | roots, group = trt, type = "l", col = col,
-                         lty = lty, main = ifelse(missing(main), main0, main), ylim = ylim + diff(ylim)/20*c(-1, 1),
+                         lty = lty, lwd = lwd, main = ifelse(missing(main), main0, main), ylim = ylim + diff(ylim)/20*c(-1, 1),
                          xlab = "Time",  ylab = "Score", as.table = TRUE, key = key, ...))
             devAskNewPage(FALSE)
             layout <- trellis.currentLayout()
@@ -116,12 +115,12 @@ plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject 
             subj <- gl(ns, nf, length(roots), labels = levels(x[[1]]$subject))
         else subj <- NULL
         if (ns > 1) {
-            key <- list(space = space, corner = corner, lines = list(col = col, lty = lty),
+            key <- list(space = space, corner = corner, lines = list(col = col, lty = lty, lwd = lwd),
                         type = "l", text = list(levels(subj)), border = TRUE, columns = columns)
         }
         else key <- NULL
         xyplot(unlist(ycoef) ~ freq | roots, group=subj, type="l",
                main = ifelse(missing(main), 'Signature by Number of Roots', main),
-               col = col, lty = lty, xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ...)
+               col = col, lty = lty, lwd = lwd, xlab = xlab,  ylab = ylab, as.table = TRUE, key = key, ...)
     }
 }
