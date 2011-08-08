@@ -10,7 +10,7 @@
 }
 \usage{
     \method{plot}{gslcca}(x, type = "signature", series = x$treatment,
-        individual = TRUE, overlay = FALSE, ask = dev.interactive(),
+        mean = FALSE, overlay = FALSE, ask = dev.interactive(),
         lattice = FALSE, main = NULL, xlab = NULL, ylab = NULL,
         col = NULL, lty = 1, lwd = 1.5, pch = NULL, legend.x = "topright",
         space = "bottom", corner = NULL, columns = 2, ...)
@@ -22,12 +22,11 @@
   \item{series}{ if \code{x$treatment} is \code{NULL} and there are
     multiple time series for each subject, a factor to differentiate
     these series. }
-  \item{individual}{ logical: if \code{TRUE} values are plotted for
-    each level of \code{x$subject} individually, otherwise values are
+  \item{mean}{ logical: if \code{TRUE} values are 
     averaged over subjects.  }
-  \item{overlay}{ logical:  if \code{TRUE} the values for each subject
-    are overlaid on the same plot, otherwise a separate plot is
-    produced for each subject. }
+  \item{overlay}{ for \code{type = \"signature\"} only, a logical value
+    specifying whether to overlay signatures for different subjects on
+    the same plot or create a separate plot for each subject. }
   \item{ask}{ logical: if \code{TRUE}, the user is \emph{ask}ed before each plot, see
     \code{\link{par}(ask=.)}. Ignored when only one plot is produced. }
   \item{lattice}{ logical: if \code{TRUE} the values for each subject

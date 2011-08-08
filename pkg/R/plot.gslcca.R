@@ -70,19 +70,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
                 legend(x = legend.x,y=NULL, legend = paste('Subject',ls), col = col,
                        lty = lty, lwd = lwd, pch = NULL, merge = TRUE)
             }
-            else { #show fitted curves only else plot too noisy
-                fit <- tapply(x$xscores,
-                              list(x$time, interaction(subject, treatment)), I)
-                matplot(names(fit[, 1]), fit[,-1], col = col, type = "l",
-                        lty = lty, lwd = lwd, pch = pch, xlab= xlab, ylab= ylab, ...)
-                title(ifelse(missing(main),
-                             'Fitted Values Corresponding to Different Subjects',
-                             main))
-                if (nt > 1) {
-                    legend(x = legend.x,y=NULL, legend = lt, col = col,
-                           lty = lty, lwd = lwd, pch = NULL, merge = TRUE)
-                }
-            }
+            else stop("overlay only implemented for type = \"signature\"")
         }
         else if (lattice) {
             ## need to explicitly print plots as not typing directly into console
@@ -146,7 +134,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
                 for (i in seq_len(ns)) {
                     matplot(names(yscores[, 1, i]), yscores[, , i],
                             col = col, type = ifelse(scores, "p", "n"), pch = pch,
-                            xlab = xlab,  ylab = xlab, cex = 0.6, ...)
+                            xlab = xlab,  ylab = ylab, cex = 0.6, ...)
                     matlines(names(xscores[, 1, i]), xscores[, , i], col = col,
                              type = "l", lty = lty, lwd = lwd)
                     title(ifelse(missing(main),

@@ -7,6 +7,7 @@ summary.gslcca <- function(object, ...){
                 global.roots = object$global.roots,
                 subject.roots = object$subject.roots,
                 nonlinear.parameters = object$nonlinear.parameters,
+                cor = object$cor,
                 opt.value = opt.value,
                 opt.iter = opt.iter,
                 opt.conv = opt.conv)

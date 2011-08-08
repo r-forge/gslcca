@@ -1,29 +1,30 @@
 gslcca <- function (Y, # matrix of power spectra
                     formula = "Double Exponential",
                     time, # time points
-                    subject = NULL, 
+                    subject = NULL,
                     treatment = NULL,
-                    ref = 1, 
-                    separate = TRUE, 
+                    ref = 1,
+                    separate = TRUE,
                     partial = ~1,
                     data = NULL,
                     subset = NULL,
                     global.smooth = FALSE,
                     subject.smooth = TRUE,
+                    pct.explained = 0.98,
                     start = NULL,
                     ...) { # allow arguments to be passed to optim
     ## Formula must be a function of "time", possibly other var and parameters
     if (is.character(formula)){
         models <- c("Double Exponential", "Critical Exponential")
         formula <- models[agrep(formula, models)]
-        if (!length(formula)) 
-            stop("\"formula\" not recognised, only \"Double Exponential\"", 
+        if (!length(formula))
+            stop("\"formula\" not recognised, only \"Double Exponential\"",
                  "or \"Critical Exponential\" \n",
                 "can be specified as character strings")
         if (is.null(start))
             start <- switch(formula, #replicate later for multiple treatments
                             #K1 > K2 so increases from ref
-                            "Double Exponential" = list(K1 = 9, K2 = 8.5), 
+                            "Double Exponential" = list(K1 = 9, K2 = 8.5),
                             "Critical Exponential" = list(K1 = 8.5))
         formula <- switch(formula,
                           "Double Exponential" = ~ (abs(K2-K1)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
@@ -39,10 +40,10 @@ gslcca <- function (Y, # matrix of power spectra
     dummy <- reformulate(c("0", vars), response = "Y") #don't need int for mf
     formula <- as.expression(formula[[length(formula)]])
 
-    ## Collate data to ensure equal length and deal with NAs 
+    ## Collate data to ensure equal length and deal with NAs
     ## get model frame inc. Y, time, subject & treatment if specified, omit NAs
     mf <- match.call(expand.dots = FALSE)
-    m <- match(c("subject", "treatment", "time", "data", "subset"), 
+    m <- match(c("subject", "treatment", "time", "data", "subset"),
                names(mf), 0L)
     mf <- mf[c(1L, m)]
     mf$formula <- dummy
@@ -75,12 +76,12 @@ gslcca <- function (Y, # matrix of power spectra
     }
     else ntrt <- 1
 
-    if (is.null(mf$`(time)`)) 
+    if (is.null(mf$`(time)`))
         stop("'time' must be specified and have length equal to", nr, "\n")
     names(mf)[match("(time)", names(mf))] <- "time"
 
     ## take out extras from mf
-    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")), 
+    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")),
              drop = FALSE]
 
     ## Pre-smoothing of the complete data set for artefacts removal
@@ -89,8 +90,8 @@ gslcca <- function (Y, # matrix of power spectra
             Ytemp= scale(Y,scale=FALSE)
             eig=eigen(crossprod(Ytemp), only.values = TRUE)$values
             nroots=seq_along(eig)
-            global.smooth=max(nroots[(eig/eig[1])>0.001 & 
-                cumsum(eig)/sum(eig)<0.98]) + 1
+            global.smooth=max(nroots[(eig/eig[1])>0.001 &
+                cumsum(eig)/sum(eig)<pct.explained]) + 1
         }
         SVD = svd( Y, nu=global.smooth, nv=global.smooth )
         Y = SVD$u%*% (SVD$d[1:global.smooth] * t(SVD$v))
@@ -104,7 +105,7 @@ gslcca <- function (Y, # matrix of power spectra
             eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
             nroots = seq_along(eig)
             subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 &
-                cumsum(eig)/sum(eig)<0.98])
+                cumsum(eig)/sum(eig)<pct.explained])
         }
         subject.smooth = max(subject.smooth)+1
     }
@@ -118,7 +119,7 @@ gslcca <- function (Y, # matrix of power spectra
         start <- mapply(function(start, label, reps) {
             if (length(start) == 1) rep(start, reps)
             else if (length(start) == reps) start
-            else stop("there should be 1 or", reps, 
+            else stop("there should be 1 or", reps,
                       "starting values for parameter", label, "\n")
         }, start = start, label = names(start), MoreArgs = list(reps = reps),
                         SIMPLIFY = FALSE)
@@ -132,16 +133,11 @@ gslcca <- function (Y, # matrix of power spectra
     dat <- do.call("cbind", list(mf[1,, drop = FALSE], par))
     val <- eval(formula, dat)
     mt <- terms(partial)
-    if (!is.empty.model(partial)) {
-        G <- model.matrix(mt, mf[1,, drop = FALSE]) #temp value to find number of parameters associated with covariates
-        np <- ncol(G)
-    }
-    else np <- 0
     CCA.roots = 1
 
     nonlin.par <- matrix(nrow=length(unlist(start)), ncol=nind)
     ycoef <- matrix(nrow=length(f), ncol=nind)
-    xcoef <- matrix(nrow=length(val)*ntrt + np, ncol=nind)
+    xcoef <- matrix(nrow=length(val)*ntrt, ncol=nind)
 
     y.list <- x.list <- opt <- list()
     yscores <- xscores  <- numeric(nr)
@@ -163,10 +159,10 @@ gslcca <- function (Y, # matrix of power spectra
             G <- model.matrix(mt, mf[ind[[i]], , drop = FALSE])
             R = diag(nr)-G%*%solve(crossprod(G))%*%t(G)
         }
-        RYr=R%*%Yr ## better to compute directly as resids?
+        y.list[[i]]=R%*%Yr ## better to compute directly as resids?
         ## Reduce the dimensionality using svd
-        rank.RYr=qr(RYr)$rank
-        SVD = svd( RYr, nu=rank.RYr, nv=rank.RYr )
+        rank.RYr=qr(y.list[[i]])$rank
+        SVD = svd(y.list[[i]], nu=rank.RYr, nv=rank.RYr )
         D<-diag(SVD$d[1:rank.RYr],ncol=rank.RYr)
         U1<-SVD$u
         V<-SVD$v
@@ -216,21 +212,15 @@ gslcca <- function (Y, # matrix of power spectra
         Norm <- sqrt(colSums(RFrB^2))
         B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
         RFrB=RFr%*%B
-        y.list[[i]]=Yr
         yscores[ind[[i]]] = y.list[[i]]%*%ycoef[,i]
         cor[i] <- lm(yscores[ind[[i]]] ~ 0 + RFrB)$coef
         f.min[i]=Re(opt[[i]]$value)
-        ## Save intercept and covariates linear parameters.
-        if (length(include) > 1) x.list[[i]]=rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),Fr)
-        else x.list[[i]]=Fr
-        xscores[ind[[i]]] = x.list[[i]]%*%B
-        if (!is.empty.model(partial)) {
-            x.list[[i]]=cbind(x.list[[i]],G)
-            lin <- lm.fit(G, yscores[ind[[i]]] - xscores[ind[[i]]])
-            xcoef[,i] <- c(B, lin$coef)
-            xscores[ind[[i]]] = xscores[ind[[i]]] + fitted(lin)
-        }
-        else xcoef[,i] <- B
+        ## Return RF, i.e. X partialling out G
+        xscores[ind[[i]]] = RFrB
+        if (length(include) > 1) x.list[[i]]=rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),RFr)
+        else x.list[[i]]=RFr
+        ## Recalculate fitted value based on starting values to get alignment right
+        xcoef[,i] <- B
         par <- split(unlist(start), group)
         dat[nm] <- lapply(par, "[", id)
         val <- eval(formula, dat)
@@ -249,6 +239,7 @@ gslcca <- function (Y, # matrix of power spectra
     if (separate) rownames(nonlin.par) = paste(group, treatment_c, sep = "")
     else rownames(nonlin.par) = group
 
+    # need to name xcoef by columns of X (covariate columns partialled out)
     #if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
     #else rownames(xcoef)=paste('formula', treatment_c)
 
@@ -256,7 +247,8 @@ gslcca <- function (Y, # matrix of power spectra
     rownames(ycoef) <- f
 
     if (!is.null(subject))
-        colnames(nonlin.par) <- colnames(xcoef) <- colnames(ycoef) <- paste('subject',levels(subject))
+        colnames(nonlin.par) <- colnames(xcoef) <- colnames(ycoef) <- names(cor) <- names(y.list) <-
+            names(x.list) <- names(opt) <- paste('subject',levels(subject))
 
     R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(colnames(nonlin.par),'R^2')))
 

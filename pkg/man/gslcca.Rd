@@ -11,7 +11,8 @@
 \usage{
 gslcca(Y, formula = "Double Exponential", time, subject = NULL,
     treatment = NULL, ref = 1, separate = TRUE, partial = ~1, data, subset,
-    global.smooth = FALSE, subject.smooth = TRUE, start = NULL, ...)
+    global.smooth = FALSE, subject.smooth = TRUE, pct.explained = 0.98,
+    start = NULL, ...)
 }
 \arguments{
   \item{Y}{ a data matrix. }
@@ -42,7 +43,11 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
     with an automatically selected number of roots, or a scalar specifying the
     number of roots to use. }
   \item{subject.smooth}{ controls the smoothing of \code{Y} within the
-    levels of \code{subject}. Accepts the same values as \code{global.smooth}. }
+    levels of \code{subject}. Accepts the same values as
+    \code{global.smooth}. }
+  \item{pct.explained}{ a scalar between 0 and 1 indicating the desired
+    minimum percentage of variance explained by the SVD approximation
+    when \code{subject.smooth} or \code{global.smooth} is \code{TRUE}.}    
   \item{start}{ a named list of starting values for the parameters. Each
     element must have the same length as the number of non-reference
     levels of \code{treatment} or have length one, in which case the
@@ -54,27 +59,32 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
 }
 \details{
   The function fits the following model:
-  \deqn{\mathbf{Y(t)} \times \mathbf{A} = \mathbf{F(t, \theta)} \times
-    \mathbf{B} + \mathbf{G(t)} \times \mathbf{C}}{
-    Y(t) * A = F(t, theta) * B + G(t) * C}
+  \deqn{\mathbf{Y(t)} \times \mathbf{A} = \mathbf{X(t, \theta)} \times
+    \mathbf{B}}{
+    Y(t) * A = X(t, theta) * B}
   where \eqn{\mathbf{Y(t)}}{Y(t)} is a data
   matrix with rows of observations recorded at times
   \eqn{\mathbf{t}}{t}, \eqn{\mathbf{A}}{A} is a vector of loadings,
-  \eqn{\mathbf{F(t, \theta)}}{F(t, theta)} is a matrix with columns
+  \eqn{\mathbf{X(t, \theta)}}{X(t, theta)} is a matrix with columns
   containing a nonlinear function with unknown parameters for each
-  non-reference treatment level, \eqn{\mathbf{G(t)}}{G(t)} is a matrix
-  of covariates, and \eqn{\mathbf{B}}{B} and \eqn{\mathbf{C}}{C} are
-  vectors of coefficients of the functions and covariates.
+  non-reference treatment level, and \eqn{\mathbf{B}}{B} is a
+  vector of coefficients.
 
-  Setting \eqn{X(t, \theta) = (\mathbf{F(t, \theta)}|
-  \mathbf{G(t)})}{X(t, theta) = (F(t, theta):G(t))} and \eqn{D =
-  (B'|C')}, the model is in a form suitable for canonical correlation
-  analysis. The parameters \eqn{\mathbf{A}, \theta}{A, theta} and
-  \eqn{\mathbf{D}}{D} are thus estimated to optimise the correlation
+  The parameters \eqn{\mathbf{A}, \theta}{A, theta} and
+  \eqn{\mathbf{B}}{B} are estimated to optimise the correlation
   between the left- and right-hand sides of the model.
 
-  The nonlinear function may be specified by a character string for two
-  pharmacokinetic/pharmacodynamic models:
+  If \code{partial} specifies a matrix of covariates, \eqn{G}, to be
+  partialled out, then the canonical correlation analysis is based on
+  the residuals from the multivariate linear models
+  \code{lm(Y ~ 0 + G)}
+  and
+  \code{lm(X ~ 0 + G)}
+  When \code{partial = ~1} this is equivalent to centering the columns
+  of \eqn{Y} and \eqn{X}.
+
+  The nonlinear function defining \eqn{X} may be specified by a
+  character string for two pharmacokinetic/pharmacodynamic models:
   \describe{
     \item{\code{"Double Exponential"}}{\code{~ exp(-time/exp(K1))-exp(-time/exp(K2))}}
     \item{\code{"Critical Exponential"}}{\code{~ time*exp(-time/exp(K1))}}
@@ -86,11 +96,12 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
   number of roots is not specified explicitly, \eqn{k} roots are
   selected such that 
   \eqn{\lambda_k/\lambda_1 >0.001}{lambda_k/lambda_1 >0.001} and
-  \eqn{\frac{\sum_{j=1}^k \lambda_j}{\sum_{j=1}^r \lambda_j} \ge 0.98}{
-    (sum_{j=1}^k lambda_j)/(sum_{j=1}^r lambda_j) >= 0.98}
+  \eqn{\frac{\sum_{j=1}^k \lambda_j}{\sum_{j=1}^r \lambda_j} \ge p}{
+    (sum_{j=1}^k lambda_j)/(sum_{j=1}^r lambda_j) >= p}
    where \eqn{k=1,\ldots,r}{k = 1, ..., r}, \eqn{r} is the rank of
-  \code{Y} and \eqn{\lambda_1, \lambda_2, \ldots}{lambda_1, lambda_2,
-    ...} are the eigenvalues of the variance matrix.
+  \code{Y}, \eqn{\lambda_1, \lambda_2, \ldots}{lambda_1, lambda_2,
+    ...} are the eigenvalues of the variance matrix and \eqn{p} is
+  given by \code{pct.explained}.
 
   The data are then analysed for each level of \code{subject} separately
   and the data may again be smoothed at this level to remove local
@@ -101,11 +112,11 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
   \dfn{signatures}.
 
   The projected values \eqn{\mathbf{Y(t)} \times \mathbf{A}}{Y(t) * A}
-  and \eqn{\mathbf{X(t, \theta)} \times \mathbf{D}}{X(t, theta) * D} are
+  and \eqn{\mathbf{X(t, \theta)} \times \mathbf{B}}{X(t, theta) * B} are
   known as the y scores and x scores respectively. In this context, they
   can be thought of as the (projected) observed and fitted values.
   
-  Both signatures and fitted values can be visualised using
+  Signatures, observed and fitted values can be visualised using
   \code{\link{plot.gslcca}}. 
 }
 \value{
