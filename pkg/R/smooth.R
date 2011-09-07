@@ -1,7 +1,5 @@
-varySmooth <- function(x, subject.smooth = NULL, ...){
+varySmooth <- function(x, subject.smooth = 1:10, ...){
     if(!inherits(x, "gslcca")) stop("'x' must be an \"gslcca\" object")
-
-    if (is.null(subject.smooth)) subject.smooth <- seq_len(ncol(x$ycoef)/2)
 
     ## fit models varying subject.smooth
     res <- list()

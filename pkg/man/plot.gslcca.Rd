@@ -87,7 +87,7 @@ data(clonidine)
 ### Separate critical exponential model for each treatment
 result <- gslcca(spectra, "Critical Exponential",
     time = Time, treatment = Treatment, subject = Rat,
-    subject.smooth = 4, data = design)
+    subject.smooth = 4, data = clonidine)
 
 ## plot of individual signatures
 par(mfrow = c(2, 2))
@@ -103,11 +103,6 @@ plot(result, type = "fitted")
 par(mfrow = c(1, 1))
 plot(result, type = "signature", overlay = TRUE)
 
-## plot of individual projected fitted values - overlaid
-plot(result, type = "fitted", overlay = TRUE)
-## equivalent to
-## plot(result, type = "scores", overlay = TRUE)
-
 ## plot of individual signatures - lattice
 plot(result, type = "signature", lattice = TRUE)
 
@@ -122,9 +117,7 @@ par(mfrow = c(1, 1))
 plot(result, type = "signature", mean = TRUE)
 
 ## plot of mean fitted
-par(mfrow = c(1, 1))
 plot(result, type = "fitted", mean = TRUE)
-## equivalent to
-## plot(result, type = "scores", overlay = TRUE)
+
 }
 \keyword{ hplot }

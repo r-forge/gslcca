@@ -30,8 +30,13 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
     fitted <- length(agrep("fitted", type))
     if (!(signature | scores | fitted))
         stop("\"type\" not recognised - must be \"signature\", \"scores\" or \"fitted\"")
-    if (signature)
-        freq <- seq_len(nrow(x$ycoef))
+    if (signature) {
+        xaxis <- list()
+        xaxis$freq.nm <- rownames(x$ycoef)
+        freq <- suppressWarnings(as.numeric(xaxis$freq.nm))
+        if(any(is.na(freq))) freq <- xaxis$at <- seq_along(freq)
+        else xaxis <- NULL
+    }
 
     treatment <- series
     nt <- nlevels(treatment)
@@ -63,7 +68,8 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
         if (overlay) {
             if (signature) {
                 matplot(freq, x$ycoef, col=col,type='l', xlab= xlab, ylab= ylab,
-                        lty = lty, lwd = lwd, ...)
+                        lty = lty, lwd = lwd,  xaxt = "n", ...)
+                axis(1, xaxis$at, xaxis$freq.nm)
                 title(ifelse(missing(main),
                              'Signatures Corresponding to Different Subjects',
                              main))
@@ -78,6 +84,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
                 sig <- as.matrix(x$ycoef)
                 print(xyplot(sig ~ c(row(sig)) | colnames(sig)[col(sig)],
                              type=c("l"), col = col, lty = lty, lwd = lwd,
+                             scales = list(x = xaxis),
                              main = ifelse(missing(main),
                                            'Signatures Corresponding to Different Subjects', main),
                              xlab= xlab, ylab = ylab, as.table = TRUE, ...))
@@ -121,11 +128,10 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
             if (signature) {
                 for (i in seq_len(ns)) {
                     plot(freq, x$ycoef[,i],xlab=xlab,ylab=ylab,type='l',
-                         col = col[1], lty = lty, lwd = lwd, ...)
-                    title(ifelse(missing(main),
-                                 ifelse(one, 'Signature',
-                                        paste('Signature for Subject',ls[i])),
-                                 paste(main,ls[i])))
+                         col = col[1], lty = lty, lwd = lwd, xaxt = "n", ...)
+                    axis(1, xaxis$at, xaxis$freq.nm)
+                    title(paste(ifelse(missing(main), 'Signature', main),
+                                paste(" ", ls[i])[!one]))
                 }
             }
             else {
@@ -137,10 +143,8 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
                             xlab = xlab,  ylab = ylab, cex = 0.6, ...)
                     matlines(names(xscores[, 1, i]), xscores[, , i], col = col,
                              type = "l", lty = lty, lwd = lwd)
-                    title(ifelse(missing(main),
-                                 ifelse(one, 'Fitted Values',
-                                        paste('Fitted Values for Subject',ls[i])),
-                                 paste(main,ls[i])))
+                    title(paste(ifelse(missing(main), 'Fitted Values', main),
+                                paste(" ", ls[i])[!one]))
                     if (nt > 1) {
                         legend(x = legend.x, y=NULL, legend = lt, col = col,
                                lty = lty, lwd = lwd, pch = pch, merge = TRUE)
@@ -152,7 +156,8 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
     else {
         if (signature) {
             plot(rowMeans(x$ycoef),xlab=xlab, ylab = ylab, type='l',
-                 col = col[1], lty = lty, lwd = lwd, ...)
+                 col = col[1], lty = lty, lwd = lwd, xaxt = "n", ...)
+            axis(1, xaxis$at, xaxis$freq.nm)
             title(ifelse(missing(main), 'Mean Signature', main))
         }
         else {

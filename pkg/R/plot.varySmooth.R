@@ -1,8 +1,11 @@
-plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, subject = levels(x[[1]]$subject),
-                            ask = dev.interactive(), main = NULL, xlab = NULL, ylab = NULL,
+plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment, 
+                            subject = levels(x[[1]]$subject),
+                            ask = dev.interactive(), main = NULL, 
+                            xlab = NULL, ylab = NULL,
                             col = NULL, lty = 1, lwd = 1.5, pch = NULL,
                             space = "bottom", corner = NULL, columns = 2, ...){
-    if(!inherits(x, "varySmooth")) stop("'x' must be an object of class \"varySmooth\"")
+    if(!inherits(x, "varySmooth")) 
+        stop("'x' must be an object of class \"varySmooth\"")
 
     subject.smooth <- attr(x, "subject.smooth")
     nr <- length(subject.smooth)

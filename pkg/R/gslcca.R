@@ -4,7 +4,8 @@ gslcca <- function (Y, # matrix of power spectra
                     subject = NULL,
                     treatment = NULL,
                     ref = 1,
-                    separate = TRUE,
+                    separate = TRUE,# use "proportional" instead c.f. hazard?
+                    global = FALSE, ##fit one model for all subjects?
                     partial = ~1,
                     data = NULL,
                     subset = NULL,
@@ -37,13 +38,13 @@ gslcca <- function (Y, # matrix of power spectra
 
     ## anything without starting values assumed to be a variable
     vars <- setdiff(c(vars, all.vars(partial)), c("time", names(start)))
-    dummy <- reformulate(c("0", vars), response = "Y") #don't need int for mf
+    dummy <- reformulate(c("0", vars)) #don't need int for mf
     formula <- as.expression(formula[[length(formula)]])
 
     ## Collate data to ensure equal length and deal with NAs
     ## get model frame inc. Y, time, subject & treatment if specified, omit NAs
     mf <- match.call(expand.dots = FALSE)
-    m <- match(c("subject", "treatment", "time", "data", "subset"),
+    m <- match(c("Y", "subject", "treatment", "time", "data", "subset"),
                names(mf), 0L)
     mf <- mf[c(1L, m)]
     mf$formula <- dummy
@@ -52,9 +53,10 @@ gslcca <- function (Y, # matrix of power spectra
     mf <- eval(mf, parent.frame())
 
     ## split up again for convenience
-    Y <- mf$Y
+    Y <- mf$`(Y)`
     nr <- nrow(Y)
-    f <- suppressWarnings(as.numeric(colnames(Y)))
+    freq.nm <- colnames(Y)
+    f <- suppressWarnings(as.numeric(freq.nm))
     if (any(is.na(f))) f <- seq_along(f)
 
     if (!is.null(mf$`(subject)`)) {
@@ -69,9 +71,7 @@ gslcca <- function (Y, # matrix of power spectra
 
     if (!is.null(mf$`(treatment)`)) {
         treatment <- as.factor(mf$`(treatment)`)
-        if (is.numeric(ref)) ref <- levels(treatment)[ref]
-        include <- treatment != ref #can ignore reference level in computations
-        id <- unclass(factor(treatment[include]))
+        if (!is.numeric(ref)) ref <- which(levels(treatment) == ref)
         ntrt <- nlevels(treatment) - 1
     }
     else ntrt <- 1
@@ -81,7 +81,7 @@ gslcca <- function (Y, # matrix of power spectra
     names(mf)[match("(time)", names(mf))] <- "time"
 
     ## take out extras from mf
-    mf <- mf[, !(names(mf) %in% c("Y", "(subject)", "(treatment)")),
+    mf <- mf[, !(names(mf) %in% c("(Y)", "(subject)", "(treatment)")),
              drop = FALSE]
 
     ## Pre-smoothing of the complete data set for artefacts removal
@@ -97,18 +97,21 @@ gslcca <- function (Y, # matrix of power spectra
         Y = SVD$u%*% (SVD$d[1:global.smooth] * t(SVD$v))
     }
 
-    if (isTRUE(subject.smooth)) {
-        ## Automatically select number of roots
-        subject.smooth <- numeric(nind)
-        for (i in seq_len(nind)) {
-            Ytemp = scale(Y[ind[[i]],],scale=FALSE)
-            eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
-            nroots = seq_along(eig)
-            subject.smooth[i] = max(nroots[(eig/eig[1])>0.001 &
-                cumsum(eig)/sum(eig)<pct.explained])
-        }
-        subject.smooth = max(subject.smooth)+1
+    cum.pct.explained <- matrix(, nrow = ncol(Y), ncol = nind)
+    r <- numeric(nind)
+    for (i in seq_len(nind)) {
+        Ytemp = scale(Y[ind[[i]],],scale=FALSE)
+        eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
+        nroots = seq_along(eig)
+        cum.pct.explained[,i] <- cumsum(eig)/sum(eig)
+        r[i] = max(nroots[(eig/eig[1])>0.001 & 
+            cum.pct.explained[,i] < pct.explained])
     }
+    if (isTRUE(subject.smooth)) {
+        ## Set number of roots to satisfy pct.explained
+        subject.smooth <- max(r)+1
+    }
+    cum.pct.explained <- cum.pct.explained[subject.smooth,]
 
     reps <- ifelse(separate, ntrt, 1)
     if (is.null(start)) {
@@ -135,9 +138,14 @@ gslcca <- function (Y, # matrix of power spectra
     mt <- terms(partial)
     CCA.roots = 1
 
-    nonlin.par <- matrix(nrow=length(unlist(start)), ncol=nind)
-    ycoef <- matrix(nrow=length(f), ncol=nind)
+    ny <- length(f)*nind
+    if (nind > 1 & global == TRUE){
+        nind <- 1
+        ind <- list(seq_len(nr))
+    }
+    ycoef <- matrix(numeric(ny), ncol=nind)    
     xcoef <- matrix(nrow=length(val)*ntrt, ncol=nind)
+    nonlin.par <- matrix(nrow=length(unlist(start)), ncol=nind)
 
     y.list <- x.list <- opt <- list()
     yscores <- xscores  <- numeric(nr)
@@ -148,20 +156,26 @@ gslcca <- function (Y, # matrix of power spectra
         Yr = Y[ind[[i]],]
         nr=nrow(Yr)
         if (subject.smooth) {
-            SVD = svd( Yr, nu=subject.smooth, nv=subject.smooth )
-            Yr = SVD$u %*% (SVD$d[1:subject.smooth] * t(SVD$v))
+            smoother <- function(ind, x, r){
+                SVD <- svd(x[ind,], nu=r, nv=r)
+                SVD$u %*% (SVD$d[1:r] * t(SVD$v))
+            }
+            if (global) ## smooth subject data separately, then diagonalise
+                Yr <- bdiag(tapply(1:nrow(Yr), list(subject), 
+                                   smoother, Yr, subject.smooth))
+            else
+                Yr <- smoother(1:nrow(Yr), Yr, subject.smooth)
         }
-        ## Calculate the idempotent matrix R
+        ## Calculate RYr
         if (is.empty.model(partial)){
-            R = diag(nr)
+            y.list[[i]] = Yr
         }
-        else{
+        else { ## N.B equiv to doing for each subject separately, bit inefficient
             G <- model.matrix(mt, mf[ind[[i]], , drop = FALSE])
-            R = diag(nr)-G%*%solve(crossprod(G))%*%t(G)
-        }
-        y.list[[i]]=R%*%Yr ## better to compute directly as resids?
+            y.list[[i]] = lm.fit(G, as.matrix(Yr))$residuals
+        }   
         ## Reduce the dimensionality using svd
-        rank.RYr=qr(y.list[[i]])$rank
+        rank.RYr=rankMatrix(y.list[[i]])
         SVD = svd(y.list[[i]], nu=rank.RYr, nv=rank.RYr )
         D<-diag(SVD$d[1:rank.RYr],ncol=rank.RYr)
         U1<-SVD$u
@@ -172,60 +186,78 @@ gslcca <- function (Y, # matrix of power spectra
         S11.val=suppressWarnings(sqrt(S11.eig$values))
         S11.val[is.na(S11.val)]=0
         S11.sqrt <- solve(S11.eig$vectors %*% (S11.val * t(S11.eig$vectors)))
+        dat <- mf[ind[[i]], , drop = FALSE]
         if (!is.null(treatment)) {
-            include <-  treatment[ind[[i]]] != ref #can ignore reference level when finding nonlin par
-            id <- unclass(factor(treatment[ind[[i]]][include]))
-            R <- R[,include]
-            dat <- mf[ind[[i]][include], , drop = FALSE]
+            ##can ignore reference level when finding nonlin par
+            id <- unclass(factor(treatment[ind[[i]]]))
+
             F <- class.ind(id)
+            if (!is.null(ref)) {
+                F <- F[,-ref]
+                nlev <- max(id)
+                ord <- numeric(nlev)  
+                ord[ref] <- nlev
+                ord[-ref] <- seq(nlev - 1)
+                id <- ord[id]
+            }
             if (!separate) id <- 1
         }
-        else {
-            dat <- mf[ind[[i]], , drop = FALSE]
-            F <- id <- 1
-            include <- TRUE
-        }
+        else F <- id <- 1
         nm <- names(start)
         obj.f=function(Kvector) {
             par <- split(Kvector, group)
             dat[nm] <- lapply(par, "[", id)
             val <- eval(formula, dat)
-            RFr <- R %*% (val*F)
-            C <- chol(crossprod(RFr)) # cholesky decomposition of RFr %*% t(RFr)
-            z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, transpose = TRUE) # solve t(C) %*% S21 %*% S11.sqrt for z
-            log(1-eigen(crossprod(z), symmetric = TRUE, only.values = TRUE)$values[1])
+            val[is.na(val)] <- 0
+            if (is.empty.model(partial)){
+                RFr <- val*F
+            }
+            else{
+                RFr <- lm.fit(G, val*F)$residuals
+            }
+            ## cholesky decomposition of RFr %*% t(RFr)
+            C <- chol(crossprod(RFr)) 
+            ## solve t(C) %*% S21 %*% S11.sqrt for z
+            z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, 
+                           transpose = TRUE) 
+            log(1-eigen(crossprod(z), symmetric = TRUE, 
+                        only.values = TRUE)$values[1])
         }
         ## Minimize ln(1-largesteigenvalue(Cor))
-        opt[[i]] <- optim(unlist(start), obj.f, ...)
+        opt[[i]] <- suppressWarnings(optim(unlist(start), obj.f, ...))
         nonlin.par[,i]=opt[[i]]$par
         par <- split(nonlin.par[,i], group)
         dat[nm] <- lapply(par, "[", id)
         val <- eval(formula, dat)
-        Fr <- val*F
-        RFr <- R %*% Fr
+        val[is.na(val)] <- 0        
+        RFr <- val*F
+        if (!is.empty.model(partial))
+            RFr <- lm.fit(G, RFr)$residuals
         S21 <- t(RFr) %*% RYr
         S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
-        Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt, symmetric = TRUE)$vectors
-        ycoef[,i]= Re(V%*%S11.sqrt%*%Eigvectors[,CCA.roots])
-        B= Re(S22.inv.S21%*%S11.sqrt%*%Eigvectors[,CCA.roots])
+        Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt,
+                         symmetric = TRUE)$vectors
+        ycoef[,i]= V%*%S11.sqrt%*%Eigvectors[,CCA.roots]
+        B= S22.inv.S21%*%S11.sqrt%*%Eigvectors[,CCA.roots]
         RFrB=RFr%*%B
         Norm <- sqrt(colSums(RFrB^2))
         B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
-        RFrB=RFr%*%B
-        yscores[ind[[i]]] = y.list[[i]]%*%ycoef[,i]
-        cor[i] <- lm(yscores[ind[[i]]] ~ 0 + RFrB)$coef
+        RFrB=as.matrix(RFr%*%B)
+        yscores[ind[[i]]] = as.matrix(y.list[[i]])%*%ycoef[,i]
+        cor[i] <- lm.fit(RFrB, yscores[ind[[i]]])$coef
         f.min[i]=Re(opt[[i]]$value)
         ## Return RF, i.e. X partialling out G
         xscores[ind[[i]]] = RFrB
-        if (length(include) > 1) x.list[[i]]=rbind(matrix(0,nrow=sum(!include),ncol=ncol(Fr)),RFr)
-        else x.list[[i]]=RFr
-        ## Recalculate fitted value based on starting values to get alignment right
-        xcoef[,i] <- B
+        x.list[[i]]=RFr
+        ## Recalc fitted value based on starting values to get alignment right
+        xcoef[,i] <- as.vector(B)
         par <- split(unlist(start), group)
         dat[nm] <- lapply(par, "[", id)
         val <- eval(formula, dat)
-        Fr <- val*F
-        RFr <- R %*% Fr
+        val[is.na(val)] <- 0                
+        RFr <- val*F
+        if (!is.empty.model(partial))
+            RFr <- lm.fit(G, RFr)$residuals
         if (cor(xscores[ind[[i]]], rowSums(RFr)) < 0) {
             xcoef[,i] <- -xcoef[,i]
             xscores[ind[[i]]] <- -xscores[ind[[i]]]
@@ -234,33 +266,45 @@ gslcca <- function (Y, # matrix of power spectra
         }
     }
 
-    if (!is.null(treatment)) treatment_c <- paste("", setdiff(levels(treatment), ref))
+    if (!is.null(treatment)) 
+        treatment_c <- paste("", levels(treatment)[setdiff(seq(nlev), ref)])
     else treatment_c <- ""
     if (separate) rownames(nonlin.par) = paste(group, treatment_c, sep = "")
     else rownames(nonlin.par) = group
 
     # need to name xcoef by columns of X (covariate columns partialled out)
-    #if (!is.empty.model(partial)) rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
+    #if (!is.empty.model(partial)) 
+    #    rownames(xcoef)=c(paste('formula', treatment_c), colnames(G))
     #else rownames(xcoef)=paste('formula', treatment_c)
 
+    ## split signatures if necessary
+    if (global == TRUE){
+        ycoef <- matrix(ycoef, nrow=length(f))
+    }
     ycoef <- as.data.frame(ycoef)
-    rownames(ycoef) <- f
+    rownames(ycoef) <- freq.nm
 
-    if (!is.null(subject))
-        colnames(nonlin.par) <- colnames(xcoef) <- colnames(ycoef) <- names(cor) <- names(y.list) <-
-            names(x.list) <- names(opt) <- paste('subject',levels(subject))
-
-    R.square = matrix(1-exp(f.min),ncol=1, dimnames=(list(colnames(nonlin.par),'R^2')))
+    if (!is.null(subject)) {
+        if (!global){
+            colnames(nonlin.par) <- colnames(xcoef) <-
+            names(cor) <- names(y.list) <- names(x.list) <- names(opt) <-
+            paste('subject',levels(subject))
+        }
+        colnames(ycoef) <- paste('subject',levels(subject))
+    }
+        
+    R.square = matrix(1-exp(f.min),ncol=1,
+                      dimnames=(list(colnames(nonlin.par),'R^2')))
 
     out <- list(call = match.call(),
-                ycoef = ycoef, # 'signatures' rownames = subject, colnames = freq
-                xcoef = xcoef, # yet to implement, should be linear parameters on RHS; rownames - trt levels + cov names + Intercept
+                ycoef = ycoef, # 'signatures' rows = subject, cols = freq
+                xcoef = xcoef, # linear parameters on RHS
                 yscores = yscores,
                 xscores = xscores,
                 subject = subject,
                 treatment = treatment,
                 time = mf$time,
-                ref = ref, # reference level, not implemented yet (could be NULL?)
+                ref = ref, # reference level(could be NULL?)
                 nonlinear.parameters = as.data.frame(nonlin.par),
                 R.square = R.square,
                 cor = cor,
@@ -268,6 +312,7 @@ gslcca <- function (Y, # matrix of power spectra
                 x = x.list,
                 global.roots = global.smooth,
                 subject.roots = subject.smooth,
+                pct.explained = cum.pct.explained,
                 opt = opt)
     class(out) <- "gslcca"
     out
