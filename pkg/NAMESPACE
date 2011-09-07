@@ -5,6 +5,7 @@ import(lattice) # xyplot, trellis.[un]focus, trellis.currentLayout
 import(Matrix) #bdiag, sparse matrix functions
 
 importFrom(reshape, melt)
+importFrom(MASS, ginv)
 importFrom(nnet, class.ind)
 importFrom(genefilter, rowttests)
 

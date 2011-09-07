@@ -38,7 +38,7 @@ Heather Turner
 ## apply to arbitrary matrix to average over column groups
 M <- matrix(1:12, 3, 4)
 colnames(M) <- 1:4
-bandSpectra(M, breaks = c(0, 2, 4))
+bandSpectra(M, breaks = 2)
 
 ## apply to clonidine experiment
 data(clonidine)
