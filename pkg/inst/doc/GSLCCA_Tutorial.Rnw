@@ -1,0 +1,387 @@
+%\VignetteIndexEntry{GSLCCA Tutorial}
+%\VignetteKeywords{CCA, EEG, multivariate analysis}
+%\VignettePackage{gslcca}
+
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage{SweaveColor}
+\usepackage{amsmath}
+%\usepackage{txfonts} % Times, with Belleek math font and txtt for monospaced
+\usepackage[scaled=0.92]{helvet}
+\usepackage{booktabs}
+\usepackage{color}
+%\usepackage[round,authoryear]{natbib}
+\usepackage[left=2cm,top=2.5cm,nohead]{geometry}
+\usepackage[colorlinks]{hyperref}
+\definecolor{darkmagenta}{rgb}{.5,0,.5}
+\hypersetup{
+    colorlinks,%
+    citecolor=darkmagenta,
+    filecolor=darkmagenta,
+    linkcolor=darkmagenta,
+    urlcolor=blue
+}
+
+\setkeys{Gin}{width=0.8\textwidth}
+
+%% The next few definitions from "Writing Vignettes for Bioconductor Packages"
+%% by R Gentleman
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Rcode}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\textsf{#1}}}
+\newcommand{\Rclass}[1]{{#1}}
+\newcommand{\Rmethod}[1]{{\texttt{#1}}}
+\newcommand{\Rfunarg}[1]{{\texttt{#1}}}
+
+\newcommand{\R}{\textsf{R}}
+
+\newcommand{\gslcca}{\Rpackage{gslcca}}
+
+\newcommand\twiddle{{\char'176}}
+\newcommand{\bm}[1]{{\boldsymbol{#1}}}
+
+%\renewcommand{\FancyVerbFormatLine}[1]{\sl \color{blue}#1}
+\RecustomVerbatimEnvironment
+{Verbatim}{Verbatim}
+{fontshape=sl,formatcom=\color{red}}
+
+\setlength{\itemindent}{1cm}
+
+\title{GSLCCA Tutorial}
+
+\author{Heather Turner, Phil Brain and Foteini Strimenopolou}
+
+\date{For \Rpackage{gslcca} version \Sexpr{packageDescription("gslcca")[["Version"]]}, \Sexpr{Sys.Date()}\\\url{http://gslcca.r-forge.r-project.org/}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This tutorial demonstrates the use of the \Rpackage{gslcca} package for
+Generalised Semi-linear Canonical Correlation Analysis (GSLCCA) of data from EEG
+(Electroencephalogram) experiments.  
+
+Input in {\color{red}red} relies on \texttt{.txt} files not included in the 
+package, so is provided for illustration only. Input in {\color{blue}blue} can 
+be run after the package is loaded.
+
+\section{Preparing Data for Analysis}
+
+The data required for a GSLCCA analysis are a matrix of mutlivariate responses, a 
+time variable and possibly also treatment and subject variables. In the case of 
+EEG experiments, the response matrix is the mean power at each time point for a 
+number of frequencies. These power spectra are usually stored along with the 
+other variables in a tabular format.
+
+As an illustration we shall consider the \Robject{clonidine} data, which is included 
+in the \Rpackage{gslcca} package, see \Rcode{?clonidine}. This data was originally
+in a tab-delimited text file, with the first six rows and columns as follows
+\begin{verbatim}
+  Rat Treatment Time        0.98        1.95        2.93
+1  35   Control    0 0.000073800 0.000182702 0.000153585
+2  35   Control  300 0.000081100 0.000210315 0.000187891
+3  35   Control  600 0.000105919 0.000269269 0.000232081
+4  35   Control  900 0.000094700 0.000228982 0.000207461
+5  35   Control 1200 0.000091400 0.000236652 0.000228351
+6  35   Control 1500 0.000088800 0.000249708 0.000269962
+\end{verbatim}
+
+Such data can be prepared for analysis with the \Rpackage{gslcca} package using 
+the \Rcode{readSpectra} function: 
+\begin{Verbatim}
+> clonidine <- readSpectra("Clonidine Light.txt", info = 1:3, 
+>     treatment = c("Control", "Low Dose", "Middle Dose", "High Dose"))
+\end{Verbatim}
+here the first argument is the name of the tab-delimited file, \Rfunarg{info} 
+gives the indices for the "information" columns, i.e. \Rcode{Rat}, 
+\Rcode{Treatment} and \Rcode{Time}, and \Rfunarg{treatment} gives the levels of the treatment factor, 
+in order of increasing dose (over-riding the default alphabetical order). The values shown are the defaults for the \Rfunarg{info}
+and \Rfunarg{treatment} arguments so can be omitted.
+
+The function \Rfunction{readSpectra} has three additional arguments that allow
+the user to subset or aggregate the spectra that are read in. The argument 
+\Rfunarg{resolution} specifies the desired resolution of frequencies in Hz -- 
+data read in at a higher resolution is aggregated to obtain the desired 
+resolution. For example, the default setting is 1 Hz frequencies, so data read in 
+at 0.5 Hz frequencies would be aggregated by summing over each pair of frequencies.
+
+The arguments \Rfunarg{end} and \Rfunarg{nfreq} specify the end time and
+the number of frequencies to include in the result, respectively. The defaults 
+for these arguments are 42900 seconds (the last 5 minute bin in a 12 hour period) 
+and 36 frequencies (so up to 36 Hz when \Rfunarg{resolution} is 1).
+
+The object returned by \Rfunction{readSpectra} is a data frame containing the 
+information columns with their orginal names and the matrix of spectra named 
+\Robject{spectra}. This data frame can be passed to the data argument of the 
+\Rfunction{gslcca} function (described later in Section \ref{sec:GSLCCA}).
+
+For the \Robject{clonidine} data set, the data were then sub-sampled to keep 
+every other time point, however this was done purely to limit the size of the 
+data set and would not normally be done in practice.
+
+\subsection{Banded Spectra}
+
+The \Rfunction{bandSpectra} function can be used to aggregate the multivariate response
+into bands, such as the frequency bands typically used in the analysis of EEG data.
+For example, the \Robject{clonidine} data could be grouped into the delta (0--4 Hz),
+theta (4--8 Hz), alpha (8--13 Hz), beta (13--30 Hz) and gamma (>=30Hz) bands as follows:
+@ 
+<<bandSpectra>>=
+library(gslcca)
+data(clonidine)
+banded <- bandSpectra(clonidine$spectra, breaks = c(4, 8, 13, 30), 
+    labels = c("delta", "theta", "alpha", "beta", "gamma"))
+head(banded)    
+@ %def 
+%$
+
+\section{GSLCCA Analysis}
+\label{sec:GSLCCA}
+The aim of GSLCCA is to find a linear combination of the multivariate response
+that is maximally correlated with a nonlinear model. Thus we have
+\begin{equation*}
+    \bm{Y}\bm{a} = \rho(\bm{X(t, \theta) b})
+\end{equation*}
+where $\bm{Y}$ is a data matrix with rows of observations recorded at times $\bm{t}$, 
+$\bm{a}$ is a vector of loadings, $\bm{X(t, \theta)}$ is a matrix with columns
+defined by a nonlinear function with unknown parameters, $\bm{b}$ is a vector of
+coefficients and $\rho$ is the correlation to be maximised.
+
+The \Rcode{gslcca} package provides the \Rfunction{gslcca} function to conduct
+GSLCCA analysis. The two key outputs from the analysis are the vector of
+loadings $\bm{a}$, which we describe as the \textit{signature} and the fitted
+model, given by the x scores $\bm{X(t, \theta) b}$.
+
+\subsection{Performing GSLCCA}
+
+To demonstrate the use of \Rfunction{gslcca}, we shall consider a particular
+application of GSLCCA to the clonidine data. Section \ref{sec:Appendix} gives
+details on how to customise the analysis, for example specifying an alternative
+model. 
+
+A typical call to \Rfunction{gslcca} may be as follows:
+@ 
+<<Double_Exponential>>=
+result <- gslcca(spectra,  "Double Exponential", time=Time, 
+                 subject = Rat, global = FALSE,
+                 treatment = Treatment, ref = 1, separate = FALSE, 
+                 subject.smooth = TRUE, pct.explained = 0.96,
+		           data = clonidine)
+@ %def 
+
+In this example the matrix of power spectra has been specified as the multivariate
+response and the model is specified as \Rcode{"Double Exponential"} which refers to the
+two compartment model:  
+\begin{equation*}
+\exp(-k_1 t) + \exp(-k_2 t).
+\end{equation*}
+This is equivalent to specifying the model via the symbolic formula
+\begin{verbatim}
+ ~ exp(-K1 * time) + exp(-K2 * time)
+\end{verbatim}
+where \Rcode{time} is the variable specified via the \Rfunarg{time} argument and
+\Robject{K1} and \Robject{K2} are parameters. Specifying the model by name means
+that starting values for \Robject{K1} and \Robject{K2} are set by default.
+
+The \Rfunarg{subject} argument has been specified as \Robject{Rat} , so a separate
+signature will be estimated for each rat and since \Rfunarg{global = FALSE},
+the nonlinear model will also be separately estimated for each rat.
+
+The \Rfunarg{treatment} argument has been specified as \Robject{Treatment}, so a
+separate linear coefficient will be estimated for each non-reference level of the treatment factor.  Since \Rcode{separate = FALSE}, the nonlinear parameters will be the
+same. The model is fixed at zero for the reference treatment level, which is specified by \Rfunarg{ref}. 
+
+The \Rfunarg{subject.smooth} argument is set to \Rcode{TRUE}, so the power spectra
+are smoothed for each rat separately prior to analysis. The
+\Rfunarg{pct.explained} argument specifies that the smoothed matrix must capture
+at least 96\% of the variance in the original data, for each rat.
+
+Finally the \Rfunarg{data} argument has been specified, so that the objects
+\Robject{spectra}, \Robject{Time}, \Robject{Rat} and \Robject{Treatment} can be
+found. 
+
+\subsection{Examining the Result}
+
+A summary of the GSLCCA analysis can be obtained by using the
+\Rfunction{summary} function:
+@ 
+<<summary_GSLCCA>>=
+summary(result)
+@ %def 
+This summary gives some details of the smoothing performed and the model fitted for
+each rat. In this case the models are reasonably consistent across the rats, with
+the rate parameters estimated as around 10 and 7 (a model with K1 = 10 and K2 =
+7 is equivalent to a model with K1 = 7 and K2 = 10 if the sign of the linear
+coefficient is reversed). The models fit well, giving a correlation of at least
+80\%  for all rats -- we would hope to see at least a correlation of 60\%. The
+algorithm has converged for each rat, so an optimal model has been found for
+each rat, although as the model is nonlinear it is possible that this is a local
+optimum and a better solution could be found with different starting values.
+
+After checking the summary, we can view the fitted model using the plot command:
+\begin{center}
+@ 
+<<plot_fitted, fig = TRUE, eps = FALSE, width = 8>>=
+plot(result, "fitted", lattice = TRUE)
+@ %def 
+\end{center}
+Here the \Rfunarg{lattice} option is set to \Rcode{TRUE} to display all the
+models together. Again we see the models are broadly similar across
+rats. For each model, the amplitude varies by treatment, but the rate parameters
+are constant, so the curves for each treatment are proportional. The baseline
+for the control treatment is a non-zero constant because the $\bm{X}$ and $\bm{Y}$
+matrices have been centred prior to Canonical Correlation Analysis (CCA). This 
+adjustment is controlled by the \Rfunarg{partial} argument.
+
+In order to check the fit of the model, we can plot both the x scores (the
+fitted model) and the y scores (the projected observed values) as follows:
+\begin{center}
+@ 
+<<plot_scores, fig = TRUE, eps = FALSE, width = 8>>=
+plot(result, "scores", lattice = TRUE)
+@ %def 
+\end{center}
+As indicated by the correlations in the summary, the sets of scores agree quite
+well. 
+
+Finally we can look at the model signatures, using the option \Rcode{overlay =
+  TRUE} to display them in a single plot:
+  
+\setkeys{Gin}{width=0.5\textwidth}  
+\begin{center}  
+@ 
+<<plot_signatures, fig = TRUE, eps = FALSE>>=
+plot(result, "signatures", overlay = TRUE)
+@ %def 
+\end{center}
+We can see that the scale varies across rats, but the shape of the signature is
+quite consistent, with a positive peak around 6-7 Hz and negative peaks around 2
+and 9 Hz.
+
+\subsection{Saving Signatures for Further Analysis}
+
+The object returned by the \Rfunction{gslcca} function is a list containing several
+components useful for further analysis, see \Rcode{?gslcca}. One of these
+components is \Rcode{"ycoef"}, which is a data frame of the $\bm{Y}$
+coefficients, i.e. the signatures, for each rat. These can be extracted
+directly, using \Rcode{result\$ycoef}%$ 
+or using the utility function \Rfunction{signatures}. For example, we can save the
+signatures in a tab-delimited text file as follows:
+\begin{Verbatim}
+> write.table(signatures(result), "clonidine signatures.txt", sep = "\t")
+\end{Verbatim}
+@ 
+
+\section{Comparing Signatures Across Experiments (Snapshot Analysis)}
+
+In the analysis of data from EEG experiments, it is hypothesised that the
+signature represents the relative importance of each frequency in the power
+spectrum in relation to the pharmacodynamic response in the brain. The signature
+is thus related to the drug mechanism and it is of interest to compare
+signatures obtained from EEG experiments using related drugs.
+
+A simple way to do this is to use a \textit{snapshot analysis}, that is to compare the
+mean signature at each frequency using a t-test. The \Rpackage{gslcca} package 
+provides the \Rfunction{snapshot} function for this purpose.
+
+As an illustration, suppose we have saved the signatures from the GSLCCA
+analysis of two compounds, in the files, ``Compound1 signatures.txt'' and
+``Compound2 signatures.txt''. These are read in as follows:
+\begin{Verbatim}
+> sig1 <- read.delim("Compound1 signatures.txt", check.names = FALSE)
+> sig2 <- read.delim("Compound2 signatures.txt", check.names = FALSE)
+\end{Verbatim} 
+using \Rfunarg{check.names = FALSE} to preserve the numeric column names.  We
+can then call the \Rfunarg{snapshot} function to perform a snapshot analysis.
+
+The first two arguments of the snapshot function are simply the two sets of 
+signatures; setting \Rfunarg{nomalise = TRUE} means that the signatures will be 
+normalised so that the sum of squared values in each signature sums to
+one. This normalisation removes the differences in scale between rats
+and makes the signatures comparable across experiments. The \Rfunarg{names}
+argument provides names for the two compounds, which are used in the default
+titles/legends of the plots produced.
+
+The function can return a number of different plots, as specified by the
+\Rfunarg{plot} argument. The first option is \texttt{"signatures"} which
+produces a plot of the signatures for each compound, after normalisation. The
+\texttt{"mean"} option displays the mean signatures for each compound on the 
+same plot. Finally the \texttt{"pvalue"} plot produces a \textit{Manhattan} 
+plot of the p-values from the t tests comparing the signatures at each frequency. The p-values are corrected for multiple testing using Benjamini and Hochberg's false discovery rate, by default, alternative options can be specified using the
+\Rfunarg{p.adjust.method} argument.
+
+\begin{Verbatim}
+> par(mfrow = c(2,2))
+> snapshot(sig1, sig2, names = c("Compound1", "Compound2"), 
+>         plot = c("signatures", "mean", "pvalue"),
+>         normalise = TRUE)
+\end{Verbatim}
+\begin{figure}[!ht]
+    \centering
+    \includegraphics{snapshot_multiplot}
+\end{figure}
+
+A more compact display of the snapshot analysis can be obtained using the option
+\Rcode{plot = "compact"}:
+\begin{Verbatim}
+par(mfrow = c(1,1))
+snapshot(sig1, sig2, names = c("Compound1", "Compound2"), 
+         plot = "compact", normalise = TRUE)
+\end{Verbatim}
+This produces a plot of the mean signatures for each compound, color-coded by
+the significance level of the t test at each frequency. As before, this shows significant differences between the mean signatures over the conventional theta and alpha frequency bands.
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics{snapshot_compact}
+\end{figure}
+
+\section{Appendix}
+\label{sec:Appendix}
+
+\subsection{Model Specification}
+\label{sec:model specification}
+
+\subsubsection{Using a "standard" model}
+
+The \Rfunarg{formula} argument to the \Rfunction{gslcca} function specifies the
+"base" model, which defines the columns of $X(t, \theta)$. The \Rpackage{gslcca}
+package provide shortcuts for two models useful for describing the type of
+pharmacodynamic response that may be expected in the brain following an oral dose
+of a drug. Specifying the model by name means that starting values for the 
+parameters are set automatically.
+
+The first option is \Rcode{formula = "Double
+  Exponential"} which specifies the two compartment model:
+\begin{equation*}
+\alpha (\exp(-k_1 t) + \exp(-k_2 t))
+\end{equation*}
+This is equivalent to specifying
+\begin{verbatim}
+formula = ~ exp(-K1 * time) + exp(-K2 * time)
+\end{verbatim}
+where \Rcode{time} is the variable specified via the \Rfunarg{time} argument and
+\Robject{K1} and \Robject{K2} are parameters. In this case the parameters are
+initialised at \Rcode{K1 = 9} and \Rcode{K2 = 8.5}, which correspond to a time 
+to maximum of approximately $1\textthreequarters$ hours when \Rcode{time} is 
+recorded in seconds. Alternative starting values can be specified by passing a 
+named list to the \Rfunarg{start} argument, e.g.
+\begin{verbatim}
+start = list(K1 = 8, K2 = 7.5)
+\end{verbatim}
+
+The second model shortcut is \Rcode{formula = "Critical Exponential"} which specifies
+the limiting case of the Double Exponential model when the rate parameters $k_1$
+and $k_2$ are essentially the same:
+\begin{equation*}
+\alpha t \exp(-k_1 t)
+\end{equation*}
+This corresponds to setting \Rcode{formula = ~ time * exp(-K1 * time)} and
+\Rcode{start = list(K1 = 8.5)}.
+
+\end{document}
+
+

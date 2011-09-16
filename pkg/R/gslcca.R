@@ -28,8 +28,7 @@ gslcca <- function (Y, # matrix of power spectra
                             "Double Exponential" = list(K1 = 9, K2 = 8.5),
                             "Critical Exponential" = list(K1 = 8.5))
         formula <- switch(formula,
-                          "Double Exponential" = ~ (abs(K2-K1)>10e-6)*(exp(-time/exp(K1)) - exp(-time/exp(K2))) +
-                              (abs(K2-K1)<=10e-6)*(time*exp(-time/exp(K1))) ,
+                          "Double Exponential" = ~ exp(-time/exp(K1))-exp(-time/exp(K2)),
                           "Critical Exponential" = ~ time*exp(-time/exp(K1)))
     }
 
@@ -204,7 +203,10 @@ gslcca <- function (Y, # matrix of power spectra
         }
         else F <- id <- 1
         nm <- names(start)
+        qy <- qr(RYr)  
+        dy <- qy$rank
         obj.f=function(Kvector) {
+            ## evaluate RFr
             par <- split(Kvector, group)
             dat[nm] <- lapply(par, "[", id)
             val <- eval(formula, dat)
@@ -215,13 +217,12 @@ gslcca <- function (Y, # matrix of power spectra
             else{
                 RFr <- lm.fit(G, val*F)$residuals
             }
-            ## cholesky decomposition of RFr %*% t(RFr)
-            C <- chol(crossprod(RFr)) 
-            ## solve t(C) %*% S21 %*% S11.sqrt for z
-            z <- backsolve(C, crossprod(RFr, RYr) %*% S11.sqrt, 
-                           transpose = TRUE) 
-            log(1-eigen(crossprod(z), symmetric = TRUE, 
-                        only.values = TRUE)$values[1])
+            ## find cor as in MASS:::cancor
+            qx <- qr(RFr)
+            dx <- qx$rank
+            z <- svd(qr.qty(qx, qr.qy(qy, diag(1, nr, dy)))[1L:dx, , 
+                     drop = FALSE], dx, dy)
+            log(1-z$d[1])
         }
         ## Minimize ln(1-largesteigenvalue(Cor))
         opt[[i]] <- suppressWarnings(optim(unlist(start), obj.f, ...))
@@ -258,7 +259,7 @@ gslcca <- function (Y, # matrix of power spectra
         RFr <- val*F
         if (!is.empty.model(partial))
             RFr <- lm.fit(G, RFr)$residuals
-        if (cor(xscores[ind[[i]]], rowSums(RFr)) < 0) {
+        if (cor(xscores[ind[[i]]], rowSums(as.matrix(RFr))) < 0) {
             xcoef[,i] <- -xcoef[,i]
             xscores[ind[[i]]] <- -xscores[ind[[i]]]
             ycoef[,i] <- -ycoef[,i]
