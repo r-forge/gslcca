@@ -6,7 +6,7 @@ snapshot <- function(x, y,
                      bands  =  c("delta", "theta", "alpha", "beta",
                                  "gamma"),
                      col = NULL, lty = 1, lwd = 1.5, ...){  
-    freq <- as.numeric(rownames(x))
+    freq <- as.numeric(gsub("[^0-9.]", "", rownames(x)))
     ns <- ncol(x)
     nr <- min(nrow(x), nrow(y))
     

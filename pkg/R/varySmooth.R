@@ -4,7 +4,7 @@ varySmooth <- function(x, subject.smooth = 1:10, ...){
     ## fit models varying subject.smooth
     res <- list()
     for (r in subject.smooth) {
-        if (r == x$subject.roots) res[[as.character(r)]] <- x
+        if (r == x$subject.smooth) res[[as.character(r)]] <- x
         else {
             cat("Re-running gslcca with subject.smooth =", r, "\n")
             res[[as.character(r)]] <- update(x, subject.smooth = r)

@@ -4,7 +4,7 @@ gslcca <- function (Y, # matrix of power spectra
                     subject = NULL,
                     treatment = NULL,
                     ref = 1,
-                    separate = TRUE,# use "proportional" instead c.f. hazard?
+                    separate = FALSE,# use "proportional" instead c.f. hazard?
                     global = FALSE, ##fit one model for all subjects?
                     partial = ~1,
                     data = NULL,
@@ -53,9 +53,10 @@ gslcca <- function (Y, # matrix of power spectra
 
     ## split up again for convenience
     Y <- mf$`(Y)`
+    if(!is.matrix(Y)) Y <- as.matrix(Y)
     nr <- nrow(Y)
     freq.nm <- colnames(Y)
-    f <- suppressWarnings(as.numeric(freq.nm))
+    f <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", freq.nm)))
     if (any(is.na(f))) f <- seq_along(f)
 
     if (!is.null(mf$`(subject)`)) {
@@ -282,20 +283,17 @@ gslcca <- function (Y, # matrix of power spectra
     if (global == TRUE){
         ycoef <- matrix(ycoef, nrow=length(f))
     }
-    ycoef <- as.data.frame(ycoef)
     rownames(ycoef) <- freq.nm
 
     if (!is.null(subject)) {
         if (!global){
             colnames(nonlin.par) <- colnames(xcoef) <-
-            names(cor) <- names(y.list) <- names(x.list) <- names(opt) <-
-            paste('subject',levels(subject))
+                names(cum.pct.explained) <- names(cor) <- names(opt) <-
+                names(y.list) <- names(x.list) <- 
+                paste('subject',levels(subject))
         }
         colnames(ycoef) <- paste('subject',levels(subject))
     }
-        
-    R.square = matrix(1-exp(f.min),ncol=1,
-                      dimnames=(list(colnames(nonlin.par),'R^2')))
 
     out <- list(call = match.call(),
                 ycoef = ycoef, # 'signatures' rows = subject, cols = freq
@@ -306,13 +304,12 @@ gslcca <- function (Y, # matrix of power spectra
                 treatment = treatment,
                 time = mf$time,
                 ref = ref, # reference level(could be NULL?)
-                nonlinear.parameters = as.data.frame(nonlin.par),
-                R.square = R.square,
+                nonlinear.parameters = nonlin.par,
                 cor = cor,
                 y = y.list,
                 x = x.list,
-                global.roots = global.smooth,
-                subject.roots = subject.smooth,
+                global.smooth = global.smooth,
+                subject.smooth = subject.smooth,
                 pct.explained = cum.pct.explained,
                 opt = opt)
     class(out) <- "gslcca"

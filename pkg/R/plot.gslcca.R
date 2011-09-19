@@ -1,9 +1,13 @@
 plot.gslcca <- function(x, type = "signature", series = x$treatment,
-                        mean = FALSE, overlay = FALSE,
-                        ask = dev.interactive(), lattice = FALSE, main = NULL,
-                        xlab = NULL, ylab = NULL, col = NULL, lty = 1, lwd = 1.5,
+                        mean = FALSE, 
+                        overlay = length(agrep(type, "signature")),
+                        ask = dev.interactive(), 
+                        lattice = !length(agrep(type, "signature")), 
+                        main = NULL, xlab = NULL, ylab = NULL, 
+                        col = NULL, lty = 1, lwd = 1.5,
                         pch = NULL, legend.x = "topright", space = "bottom",
                         corner = NULL, columns = 2, ...){
+    
     ## control over legend and title?
     subject <- x$subject
     one <- FALSE
@@ -33,7 +37,7 @@ plot.gslcca <- function(x, type = "signature", series = x$treatment,
     if (signature) {
         xaxis <- list()
         xaxis$freq.nm <- rownames(x$ycoef)
-        freq <- suppressWarnings(as.numeric(xaxis$freq.nm))
+        freq <- suppressWarnings(as.numeric(gsub("[^0-9.]", "", xaxis$freq.nm)))
         if(any(is.na(freq))) freq <- xaxis$at <- seq_along(freq)
         else xaxis <- NULL
     }

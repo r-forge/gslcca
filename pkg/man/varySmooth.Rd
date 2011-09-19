@@ -33,5 +33,24 @@ corresponding number of SVD roots.
 \seealso{
 \code{\link{gslcca}}, \code{\link{plot.varySmooth}}
 }
-\examples{}
+\examples{
+data(clonidine)
+
+### Smoothed data - automatically select number of roots
+result <- gslcca(spectra, "Critical Exponential",
+    time = Time, treatment = Treatment, subject.smooth = TRUE,
+    data = clonidine, subset = Rat == "42")
+
+### Vary number of roots 
+multiRoots <- varySmooth(result, 2:15)
+
+## plot optimised value
+plot(multiRoots, "opt")
+
+## plot fitted values
+plot(multiRoots, "fitted")
+
+## plot signature
+plot(multiRoots, "signature")
+}
 \keyword{ multivariate }

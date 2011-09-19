@@ -105,17 +105,8 @@ plot(result, "signature")
 ## projected values
 plot(result, "fitted")
 
-### Vary number of roots 
-multiRoots <- varySmooth(result, 2:15)
-
-## plot optimised value
-plot(multiRoots, "opt")
-
-## plot fitted values
-plot(multiRoots, "fitted")
-
-## plot signature
-plot(multiRoots, "signature")
+## projected values
+plot(result, "scores")
 
 }
 \keyword{datasets}

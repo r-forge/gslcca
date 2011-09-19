@@ -9,8 +9,8 @@
   Shortcuts are provided for PK/PD models suitable for analysing EEG data.
 }
 \usage{
-gslcca(Y, formula = "Double Exponential", time, subject = NULL,
-    treatment = NULL, ref = 1, separate = TRUE, partial = ~1, data, subset,
+gslcca(Y, formula = "Double Exponential", time, subject = NULL, global = FALSE,
+    treatment = NULL, ref = 1, separate = FALSE, partial = ~1, data, subset,
     global.smooth = FALSE, subject.smooth = TRUE, pct.explained = 0.98,
     start = NULL, ...)
 }
@@ -22,9 +22,11 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
     corresponding PK/PD model (see Details). }
   \item{time}{ a vector of time values corresponding to the rows of \code{Y}. }
   \item{subject}{ an optional factor grouping the rows of Y. If
-    specified, data corresponding to to each level will be analysed
-    separately (after any smoothing specified by
-    \code{global.smooth}). }
+    specified, a separate set of coefficients of Y will be estimated for each 
+    subject. }
+  \item{global}{ if \code{subject} is specified, whether to fit a global model 
+    for all subjects, i.e. whether the nonlinear model and associated 
+    coefficients should be the same for all subjects.}
   \item{treatment}{ an optional factor (nested within \code{subject} if
     specified) identifying groups for which separate parameters
     should be estimated. }
@@ -37,7 +39,8 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
     partial out of the CCA analysis (may be \code{NULL}).}
   \item{data}{ an optional data frame in which to evaluate the variables
     in \code{time}, \code{subject}, \code{treatment} and \code{partial}. }
-  \item{subset}{}
+  \item{subset}{ an optional logical or numeric vector specifying a subset of
+  observations to be used in the fitting process.}
   \item{global.smooth}{ controls the smoothing of \code{Y} via SVD. Must
     be one of \code{FALSE} for no smoothing, \code{TRUE} for smoothing
     with an automatically selected number of roots, or a scalar specifying the
@@ -122,30 +125,60 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL,
 \value{
   An object of class \code{"gslcca"}, which is a list with components
   \item{call}{ the call to \code{gslcca}.  }
-  \item{ycoef}{ a data frame giving the coefficients of the left-hand
-    side matrix for each subject.  }
-  \item{xcoef}{  a data frame giving the coefficients of the right-hand
-    side matrix for each subject. }
-  \item{scores}{ a data frame containing the variables specified by
-  \code{subject}, \code{treatment} and \code{time} along with new variables
-  \code{yscores} and \code{xscores}, containing the projected values
-  for all subjects.} 
+  \item{ycoef}{ a matrix of the coefficients of the left-hand
+    side matrix, with one column per subject.  }
+  \item{xcoef}{  a matrix of the coefficients of the left-hand
+    side matrix, with one column per subject if \code{global = FALSE}. }
+  \item{yscores}{ a vector of y scores for all subjects.}
+  \item{xscores}{ a vector of x scores for all subjects.}
+  \item{subject}{ the variables specified by \code{subject}.}
+  \item{treatment}{ the variables specified by \code{treatment}.}
+  \item{time}{ the variables specified by \code{time}.}
   \item{ref}{ the reference level of \code{treatment}.}
-  \item{nonlinear.parameters}{ a data frame giving the estimated
-    nonlinear parameters for each subject. }
-  \item{y}{ a list giving the left-hand side matrix for each subject. }
-  \item{x}{ a list giving the right-hand side matrix for each subject. }
-  \item{global.smooth}{ the value of \code{global.smooth}. }
-  \item{subject.smooth}{ the value of \code{subject.smooth}. }
-  \item{opt}{ the output from \code{optim} for each subject. }
+  \item{nonlinear.parameters}{ a matrix of the estimated
+    nonlinear parameters, with one column per subject. }
+  \item{y}{ a list giving the (smoothed) left-hand side matrix for each subject,
+  after partialling out any covariates specified by \code{partial}. }
+  \item{x}{ a list giving the right-hand side matrix for each subject,
+  after partialling out any covariates specified by \code{partial}. }
+  \item{global.smooth}{ the number of roots used in global smoothing. }
+  \item{subject.smooth}{ the number of roots used for subject-level smoothing. }
+  \item{pct.explained}{ the percentage of variance explained by the subject-level
+  approximation. }
+  \item{opt}{ a list of output from \code{optim}, with one element per subject
+  if \code{global = FALSE}. }
 }
 \references{
   Brain, P., Strimenopoulou, F. and Ivarsson, M. (2011). Analysing
   electroencephalogram (EEG) data using Extended Semi-Linear Canonical
   Correlation Analysis.  Submitted. }
 \author{ Foteini Strimenopoulou and Heather Turner }
-\seealso{ \code{\link{plot.gslcca}}, \code{\link{varySmooth}}}
+\seealso{ 
+\code{\link{readSpectra}} and \code{\link{bandSpectra}} for reading in spectra 
+and aggregating over frequency bands.
+
+\code{\link{plot.gslcca}}, \code{\link{varySmooth}} and \code{\link{gslcca-misc}}
+for functions to plot \code{gslcca} results, check sensitivity with regards to
+smoothing and access components of \code{"gslcca"} objects.
+}
 \examples{
 data(clonidine)
+
+### Fit separate Double Exponential models for each rate,
+### with amplitude varying by treatment
+result <- gslcca(spectra, "Double Exponential",
+    time = Time, subject = Rat, treatment = Treatment, 
+    subject.smooth = TRUE, pct.explained = 0.96, 
+    data = clonidine)
+
+## drug signature
+plot(result, "signature")
+
+## projected values
+plot(result, "fitted")
+
+## projected values
+plot(result, "scores")
+
 }
 \keyword{ multivariate }

@@ -1,4 +1,4 @@
-export(bandSpectra, gslcca, readSpectra, snapshot, varySmooth)
+export(bandSpectra, gslcca, readSpectra, signatures, snapshot, varySmooth)
 
 import(colorspace) #rainbow_hcl, hex, polarLUV
 import(lattice) # xyplot, trellis.[un]focus, trellis.currentLayout
@@ -10,6 +10,7 @@ importFrom(genefilter, rowttests)
 
 #S3method(formula, gslcca)
 #S3method(coef, gslcca)
+S3method(fitted, gslcca)
 S3method(plot, gslcca)
 S3method(print, gslcca)
 S3method(summary, gslcca)

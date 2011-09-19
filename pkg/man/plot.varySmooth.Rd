@@ -17,7 +17,8 @@ Plot the optimised value, \sQuote{signatures} (loadings of the
 }
 \arguments{
   \item{x}{ an object of class \code{"varySmooth"} as returned by \code{\link{varySmooth}}}
-  \item{type}{ the type of plot: either \code{"opt"}, \code{"signature"} or \code{"fitted"}. }
+  \item{type}{ the type of plot: either \code{"opt"}, \code{"signature"},
+  \code{"fitted"}, or \code{"scores"}. }
   \item{series}{ if \code{x[[1]]$treatment} is \code{NULL} and there are
     multiple time series for each subject, a factor to differentiate
     these series. }
@@ -57,19 +58,41 @@ Plot the optimised value, \sQuote{signatures} (loadings of the
   legend text for each subject.
 
   For \code{type = "fitted"}, the \eqn{\mathbf{X}}{X} scores are
-  displayed with lines and the \eqn{\mathbf{Y}}{Y} scores are displayed
-  with points and the display is again trellised by the number of roots
+  displayed, trellised by the number of roots
   used in the GSLCCA. If there are multiple \eqn{\mathbf{X}}{X} scores
   for each time point, then a line is displayed for each times series
   specified by \code{series} (usually the treatment factor used in
   GSLCCA) and the arguments \code{col}, \code{lty} and \code{pch}
   control the display for each series. By default, grey or black is used
   to display values corresponding to the reference treatment (specified
-  by \code{x$ref}). 
+  by \code{x$ref}).
+  
+  For \code{type = "scores"} the \eqn{\mathbf{X}}{X} scores are displayed as 
+  for \code{type = "fitted"} and points are added for the \eqn{\mathbf{Y}}{Y}
+  scores, again coloured by \code{series}.
 }
 \author{ Heather Turner }
 \seealso{
 \code{\link{gslcca}}, \code{\link{varySmooth}}
 }
-\examples{}
+\examples{
+data(clonidine)
+
+### Smoothed data - automatically select number of roots
+result <- gslcca(spectra, "Critical Exponential",
+    time = Time, treatment = Treatment, subject.smooth = TRUE,
+    data = clonidine, subset = Rat == "42")
+
+### Vary number of roots 
+multiRoots <- varySmooth(result, 2:15)
+
+## plot optimised value
+plot(multiRoots, "opt")
+
+## plot fitted values
+plot(multiRoots, "fitted")
+
+## plot signature
+plot(multiRoots, "signature")
+}
 \keyword{ multivariate }

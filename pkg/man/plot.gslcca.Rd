@@ -10,15 +10,15 @@
 }
 \usage{
     \method{plot}{gslcca}(x, type = "signature", series = x$treatment,
-        mean = FALSE, overlay = FALSE, ask = dev.interactive(),
-        lattice = FALSE, main = NULL, xlab = NULL, ylab = NULL,
+        mean = FALSE, overlay = (type == "signature"), ask = dev.interactive(),
+        lattice = (type != "signature"), main = NULL, xlab = NULL, ylab = NULL,
         col = NULL, lty = 1, lwd = 1.5, pch = NULL, legend.x = "topright",
         space = "bottom", corner = NULL, columns = 2, ...)
 }
 \arguments{
   \item{x}{ an object of class \code{"gslcca"}. }
-  \item{type}{ the type of plot: either \code{"signature"} or
-    \code{"fitted"}. }
+  \item{type}{ the type of plot: either \code{"signature"},
+    \code{"fitted"} or \code{"scores"}. }
   \item{series}{ if \code{x$treatment} is \code{NULL} and there are
     multiple time series for each subject, a factor to differentiate
     these series. }
@@ -63,17 +63,17 @@
   legend text for each subject.
 
   For \code{type = "fitted"}, the \eqn{\mathbf{X}}{X} scores are
-  displayed with lines and the \eqn{\mathbf{Y}}{Y} scores are displayed
-  with points.If there are multiple \eqn{\mathbf{X}}{X} scores
+  displayed with lines. If there are multiple \eqn{\mathbf{X}}{X} scores
   for each time point, then a line is displayed for each times series
   specified by \code{series} (usually the treatment factor used in
   GSLCCA) and the arguments \code{col}, \code{lty},
   \code{pch} and \code{legend.x} control the display for each
   series. By default, grey or black is used to display values
-  corresponding to the reference treatment (specified by \code{x$ref}). The
-  \eqn{\mathbf{Y}}{Y} scores are not included in the plot when
-  \code{individual = FALSE} or when \code{individual = TRUE} and
-  \code{overlay = TRUE}.
+  corresponding to the reference treatment (specified by \code{x$ref}). 
+  
+  For \code{type = "scores"} the \eqn{\mathbf{X}}{X} scores are displayed as 
+  for \code{type = "fitted"} and points are added for the \eqn{\mathbf{Y}}{Y}
+  scores, again coloured by \code{series}.
 }
 \author{
   Heather Turner
@@ -90,30 +90,27 @@ result <- gslcca(spectra, "Critical Exponential",
     subject.smooth = 4, data = clonidine)
 
 ## plot of individual signatures
-par(mfrow = c(2, 2))
-plot(result, type = "signature")
+plot(result, type = "signature", overlay = FALSE)
 
 ## plot of individual projected observed and fitted values
-plot(result, type = "scores")
+plot(result, type = "scores", lattice = FALSE)
 
 ## plot of individual projected fitted values
-plot(result, type = "fitted")
+plot(result, type = "fitted", lattice = FALSE)
 
 ## plot of individual signatures - overlaid
-par(mfrow = c(1, 1))
-plot(result, type = "signature", overlay = TRUE)
+plot(result, type = "signature")
 
 ## plot of individual signatures - lattice
-plot(result, type = "signature", lattice = TRUE)
+plot(result, type = "signature", overlay = FALSE, lattice = TRUE)
 
 ## plot of individual projected observed and fitted values - lattice
-plot(result, type = "scores", lattice = TRUE)
+plot(result, type = "scores")
 
 ## plot of individual projected fitted values - lattice
-plot(result, type = "fitted", lattice = TRUE)
+plot(result, type = "fitted")
 
 ## plot of mean signature
-par(mfrow = c(1, 1))
 plot(result, type = "signature", mean = TRUE)
 
 ## plot of mean fitted

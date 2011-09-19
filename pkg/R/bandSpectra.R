@@ -1,4 +1,4 @@
-bandSpectra <- function(spectra, breaks = NULL, labels = NULL, ...){
+bandSpectra <- function(spectra,  breaks = NULL, labels = NULL, ...){
     ## convert breaks to frequency bands
     freq <- as.numeric(colnames(spectra))
     breaks <- c(floor(min(freq - 1, 0)), breaks, ceiling(max(freq) + 1))
