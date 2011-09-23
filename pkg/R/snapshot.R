@@ -18,5 +18,7 @@ snapshot <- function(x, y,
     pvalue <- p.adjust(rowttests(as.matrix(cbind(x, y)), grp, ...)$p.value, 
                        method = p.adjust.method)
 
-    list(call = match.call(), x = x, y = y, pvalue = pvalue)
+    res <- list(call = match.call(), x = x, y = y, pvalue = pvalue)
+    class(res) <- "snapshot"
+    res
 }

@@ -10,9 +10,9 @@
 }
 \usage{
 gslcca(Y, formula = "Double Exponential", time, subject = NULL, global = FALSE,
-    treatment = NULL, ref = 1, separate = FALSE, partial = ~1, data, subset,
-    global.smooth = FALSE, subject.smooth = TRUE, pct.explained = 0.98,
-    start = NULL, ...)
+    treatment = NULL, ref = 1, separate = FALSE, partial = ~1, data = NULL, 
+    subset = NULL, global.smooth = FALSE, subject.smooth = TRUE, 
+    pct.explained = 0.96, start = NULL, ...)
 }
 \arguments{
   \item{Y}{ a data matrix. }
@@ -157,7 +157,7 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL, global = FALSE,
 \code{\link{readSpectra}} and \code{\link{bandSpectra}} for reading in spectra 
 and aggregating over frequency bands.
 
-\code{\link{plot.gslcca}}, \code{\link{varySmooth}} and \code{\link{gslcca-misc}}
+\code{\link{plot.gslcca}}, \code{\link{varySmooth}} and \code{\link[=signatures]{gslcca-misc}}
 for functions to plot \code{gslcca} results, check sensitivity with regards to
 smoothing and access components of \code{"gslcca"} objects.
 }

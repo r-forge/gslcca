@@ -8,7 +8,7 @@ Re-run GSLCCA with different amounts of smoothing at the subject level
 prior to analysis.
 }
 \usage{
-varySmooth(x, subject.smooth = NULL, ...)
+varySmooth(x, subject.smooth = 1:10, ...)
 }
 \arguments{
   \item{x}{ a \code{"gslcca"} object as returned by \code{\link{gslcca}}.}

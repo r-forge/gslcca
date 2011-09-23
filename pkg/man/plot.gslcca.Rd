@@ -10,10 +10,11 @@
 }
 \usage{
     \method{plot}{gslcca}(x, type = "signature", series = x$treatment,
-        mean = FALSE, overlay = (type == "signature"), ask = dev.interactive(),
-        lattice = (type != "signature"), main = NULL, xlab = NULL, ylab = NULL,
-        col = NULL, lty = 1, lwd = 1.5, pch = NULL, legend.x = "topright",
-        space = "bottom", corner = NULL, columns = 2, ...)
+        mean = FALSE, overlay = length(agrep(type, "signature")), 
+        ask = dev.interactive(), lattice = !length(agrep(type, "signature")), 
+        main = NULL, xlab = NULL, ylab = NULL, col = NULL, lty = 1, lwd = 1.5, 
+        pch = NULL, legend.x = "topright", space = "bottom", corner = NULL, 
+        columns = 2, ...)
 }
 \arguments{
   \item{x}{ an object of class \code{"gslcca"}. }

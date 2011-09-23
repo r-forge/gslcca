@@ -8,7 +8,7 @@ Performs t-tests to test for differences in the mean loadings between two sets
 of signatures found using GSLCCA. Corrects for multiple comparisons.
 }
 \usage{
-snapshot(x, y, normalise = TRUE, p.adjust.method = "fdr", ...)
+snapshot(x, y, p.adjust.method = "fdr", normalise = TRUE, ...)
 }
 \arguments{
   \item{x, y}{
@@ -56,7 +56,7 @@ A list with the following components
 \references{
 Benjamini, Y., and Hochberg, Y. (1995). Controlling the false discovery rate: a 
 practical and powerful approach to multiple testing. 
-\it{Journal of the Royal Statistical Society Series B}, \bold{57}, 289--300.
+\emph{Journal of the Royal Statistical Society Series B}, \bold{57}, 289--300.
 }
 \author{
 Heather Turner

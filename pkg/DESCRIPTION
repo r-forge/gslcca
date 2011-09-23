@@ -1,7 +1,7 @@
 Package: gslcca
 Title: Generalized Semi-Linear Canonical Correlation Analysis
 Version: 0.1-0
-Date: $Date$
+Date: 2011-09-22
 Author: Foteini Strimenopoulou, Heather Turner and Phil Brain
 Maintainer: Heather Turner <ht@heatherturner.net>
 Description: This is a package for Generalized Semi-linear Canonical Correlation Analysis (GSLCCA, described in Brain et al, 2011).  GSLCCA estimates the parameters of a given nonlinear model to maximize the correlation with a linear combination of multiple response variables. This method was developed to characterize EEG power spectra under different treatment regimens in research and development projects at Pfizer.

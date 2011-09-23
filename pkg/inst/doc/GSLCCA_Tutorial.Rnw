@@ -221,7 +221,8 @@ algorithm has converged for each rat, so an optimal model has been found for
 each rat, although as the model is nonlinear it is possible that this is a local
 optimum and a better solution could be found with different starting values.
 
-After checking the summary, we can view the fitted model using the plot command:
+After checking the summary, we can view the fitted model using the 
+\Rfunction{plot} function:
 \begin{center}
 @ 
 <<plot_fitted, fig = TRUE, eps = FALSE, width = 8>>=
@@ -249,14 +250,14 @@ well.
 
 Finally we can look at the model signatures, using the option \Rcode{overlay =
   TRUE} to display them in a single plot:
-  
-\setkeys{Gin}{width=0.5\textwidth}  
+ \setkeys{Gin}{width=0.6\textwidth}
 \begin{center}  
 @ 
-<<plot_signatures, fig = TRUE, eps = FALSE>>=
+<<plot_signatures, fig = TRUE, eps = FALSE, height = 5, width = 7>>=
 plot(result, "signatures", overlay = TRUE)
 @ %def 
 \end{center}
+
 We can see that the scale varies across rats, but the shape of the signature is
 quite consistent, with a positive peak around 6-7 Hz and negative peaks around 2
 and 9 Hz.
@@ -271,7 +272,8 @@ directly, using \Rcode{result\$ycoef}%$
 or using the utility function \Rfunction{signatures}. For example, we can save the
 signatures in a tab-delimited text file as follows:
 \begin{Verbatim}
-> write.table(signatures(result), "clonidine signatures.txt", sep = "\t")
+> write.table(signatures(result), "clonidine signatures.txt", 
++             sep = "\t")
 \end{Verbatim}
 @ 
 
@@ -291,53 +293,58 @@ As an illustration, suppose we have saved the signatures from the GSLCCA
 analysis of two compounds, in the files, ``Compound1 signatures.txt'' and
 ``Compound2 signatures.txt''. These are read in as follows:
 \begin{Verbatim}
-> sig1 <- read.delim("Compound1 signatures.txt", check.names = FALSE)
-> sig2 <- read.delim("Compound2 signatures.txt", check.names = FALSE)
+> sig1 <- read.delim("Compound1 signatures.txt", 
++                    check.names = FALSE)
+> sig2 <- read.delim("Compound2 signatures.txt", 
++                    check.names = FALSE)
 \end{Verbatim} 
 using \Rfunarg{check.names = FALSE} to preserve the numeric column names.  We
-can then call the \Rfunarg{snapshot} function to perform a snapshot analysis.
-
-The first two arguments of the snapshot function are simply the two sets of 
-signatures; setting \Rfunarg{nomalise = TRUE} means that the signatures will be 
+can then call the \Rfunarg{snapshot} function to perform a snapshot analysis:
+\begin{Verbatim}
+> result <- snapshot(sig1, sig2, normalise = TRUE)
+\end{Verbatim}
+Setting \Rfunarg{nomalise = TRUE} means that the signatures will be 
 normalised so that the sum of squared values in each signature sums to
 one. This normalisation removes the differences in scale between rats
-and makes the signatures comparable across experiments. The \Rfunarg{names}
-argument provides names for the two compounds, which are used in the default
-titles/legends of the plots produced.
+and makes the signatures comparable across experiments.
 
-The function can return a number of different plots, as specified by the
-\Rfunarg{plot} argument. The first option is \texttt{"signatures"} which
-produces a plot of the signatures for each compound, after normalisation. The
-\texttt{"mean"} option displays the mean signatures for each compound on the 
-same plot. Finally the \texttt{"pvalue"} plot produces a \textit{Manhattan} 
-plot of the p-values from the t tests comparing the signatures at each frequency. The p-values are corrected for multiple testing using Benjamini and Hochberg's false discovery rate, by default, alternative options can be specified using the
-\Rfunarg{p.adjust.method} argument.
+The \Rfunction{snapshot} function returns the set of (normalised) signatures 
+for each compound, the two mean signatures and p-values from the $t$-tests 
+comparing the mean signatures at each frequency. The p-values are corrected for 
+multiple testing using Benjamini and Hochberg's false discovery rate, by default, 
+alternative options can be specified using the \Rfunarg{p.adjust.method} 
+argument.
 
+The main components of the \Robject{result} object can be displayed using 
+\Rfunction{plot} with the argument \Rcode{type = c("signatures", "means", 
+"pvalue")}; the \Rfunarg{names} argument provides names for the two compounds, 
+which are used in the default titles/legends of the plots produced.
 \begin{Verbatim}
 > par(mfrow = c(2,2))
-> snapshot(sig1, sig2, names = c("Compound1", "Compound2"), 
->         plot = c("signatures", "mean", "pvalue"),
->         normalise = TRUE)
+> plot(result, type = c("signatures", "means", "pvalue"), 
+>      names = c(comp1, comp2))
 \end{Verbatim}
 \begin{figure}[!ht]
     \centering
-    \includegraphics{snapshot_multiplot}
+    \scalebox{0.9}{\includegraphics{snapshot_multiplot}}
 \end{figure}
+
 
 A more compact display of the snapshot analysis can be obtained using the option
-\Rcode{plot = "compact"}:
+\Rcode{type = "compact"}:
 \begin{Verbatim}
-par(mfrow = c(1,1))
-snapshot(sig1, sig2, names = c("Compound1", "Compound2"), 
-         plot = "compact", normalise = TRUE)
+> par(mfrow = c(1,1))
+> plot(result, type = "compact", names = c(comp1, comp2))
 \end{Verbatim}
-This produces a plot of the mean signatures for each compound, color-coded by
-the significance level of the t test at each frequency. As before, this shows significant differences between the mean signatures over the conventional theta and alpha frequency bands.
 
 \begin{figure}[!ht]
     \centering
-    \includegraphics{snapshot_compact}
+    \includegraphics[height = 3in, width = 3.5in]{snapshot_compact}
 \end{figure}
+This produces a plot of the mean signatures for each compound, color-coded by
+the significance level of the $t$-test at each frequency. As before, this shows 
+significant differences between the mean signatures over the conventional theta 
+and alpha frequency bands.
 
 \section{Appendix}
 \label{sec:Appendix}

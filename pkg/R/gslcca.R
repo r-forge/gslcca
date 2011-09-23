@@ -2,16 +2,16 @@ gslcca <- function (Y, # matrix of power spectra
                     formula = "Double Exponential",
                     time, # time points
                     subject = NULL,
+                    global = FALSE, ##fit one model for all subjects?
                     treatment = NULL,
                     ref = 1,
                     separate = FALSE,# use "proportional" instead c.f. hazard?
-                    global = FALSE, ##fit one model for all subjects?
                     partial = ~1,
                     data = NULL,
                     subset = NULL,
                     global.smooth = FALSE,
                     subject.smooth = TRUE,
-                    pct.explained = 0.98,
+                    pct.explained = 0.96,
                     start = NULL,
                     ...) { # allow arguments to be passed to optim
     ## Formula must be a function of "time", possibly other var and parameters

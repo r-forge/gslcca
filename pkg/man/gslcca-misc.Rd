@@ -11,7 +11,7 @@ object returned by the function \code{gslcca}.
 \usage{
 signatures(object, ...)
 
-method{fitted}{gslcca} <- function(object, ...)
+\method{fitted}{gslcca}(object, ...)
 }
 \arguments{
   \item{object}{
@@ -38,7 +38,8 @@ Heather Turner
 }
 \examples{
 data(clonidine)
-banded <- bandSpectra(clonidine$spectra)
+banded <- bandSpectra(clonidine$spectra, breaks = c(4, 8, 13, 30), 
+             labels = c("delta", "theta", "alpha", "beta", "gamma"))
 result <- gslcca(banded, "Critical Exponential",
     time = Time, treatment = Treatment, subject.smooth = TRUE,
     data = clonidine, subset = Rat == "42")
