@@ -13,6 +13,9 @@ gslcca <- function (Y, # matrix of power spectra
                     subject.smooth = TRUE,
                     pct.explained = 0.96,
                     start = NULL,
+                    method = "L-BFGS-B",
+                    lower = 2,
+                    upper = 15,
                     ...) { # allow arguments to be passed to optim
     ## Formula must be a function of "time", possibly other var and parameters
     if (is.character(formula)){
@@ -102,15 +105,14 @@ gslcca <- function (Y, # matrix of power spectra
     for (i in seq_len(nind)) {
         Ytemp = scale(Y[ind[[i]],],scale=FALSE)
         eig = eigen(crossprod(Ytemp), only.values = TRUE)$values
-        nroots = seq_along(eig)
         cum.pct.explained[,i] <- cumsum(eig)/sum(eig)
-        r[i] = max(nroots[(eig/eig[1])>0.001 & 
-            cum.pct.explained[,i] < pct.explained])
+        r[i] = sum((eig/eig[1])>0.001 & cum.pct.explained[,i] < pct.explained)
     }
     if (isTRUE(subject.smooth)) {
         ## Set number of roots to satisfy pct.explained
         subject.smooth <- max(r)+1
     }
+    else subject.smooth <- ncol(Y)
     cum.pct.explained <- cum.pct.explained[subject.smooth,]
 
     reps <- ifelse(separate, ntrt, 1)
@@ -223,7 +225,7 @@ gslcca <- function (Y, # matrix of power spectra
             dx <- qx$rank
             z <- svd(qr.qty(qx, qr.qy(qy, diag(1, nr, dy)))[1L:dx, , 
                      drop = FALSE], dx, dy)
-            log(1-z$d[1])
+            log(1-(z$d[1])^2)
         }
         ## Minimize ln(1-largesteigenvalue(Cor))
         opt[[i]] <- suppressWarnings(optim(unlist(start), obj.f, ...))
@@ -235,16 +237,15 @@ gslcca <- function (Y, # matrix of power spectra
         RFr <- val*F
         if (!is.empty.model(partial))
             RFr <- lm.fit(G, RFr)$residuals
-        S21 <- t(RFr) %*% RYr
-        S22.inv.S21 <- solve(crossprod(RFr)) %*% S21
-        Eigvectors=eigen(S11.sqrt %*% t(S21) %*% S22.inv.S21 %*% S11.sqrt,
-                         symmetric = TRUE)$vectors
-        ycoef[,i]= V%*%S11.sqrt%*%Eigvectors[,CCA.roots]
-        B= S22.inv.S21%*%S11.sqrt%*%Eigvectors[,CCA.roots]
+        ## find cor as in MASS:::cancor
+        qx <- qr(RFr)
+        dx <- qx$rank
+        z <- svd(qr.qty(qx, qr.qy(qy, diag(1, nr, dy)))[1L:dx, , 
+                 drop = FALSE], dx, dy)
+        ycoef[,i]= V %*% backsolve((qy$qr)[1L:dy, 1L:dy, drop = FALSE],
+                                   z$v)[,CCA.roots]
+        B= backsolve((qx$qr)[1L:dx, 1L:dx, drop = FALSE], z$u)[,CCA.roots]
         RFrB=RFr%*%B
-        Norm <- sqrt(colSums(RFrB^2))
-        B <- B/matrix(Norm,nrow(B),ncol=CCA.roots,byrow=T)
-        RFrB=as.matrix(RFr%*%B)
         yscores[ind[[i]]] = as.matrix(y.list[[i]])%*%ycoef[,i]
         cor[i] <- lm.fit(RFrB, yscores[ind[[i]]])$coef
         f.min[i]=Re(opt[[i]]$value)

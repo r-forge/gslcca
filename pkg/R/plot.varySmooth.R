@@ -53,7 +53,7 @@ plot.varySmooth <- function(x, type = "opt", series = x[[1]]$treatment,
     if (type == "opt") {
         opt <- lapply(x, function(x) sapply(x$opt, "[[", "value"))
         roots <- rep(subject.smooth, each = length(opt[[1]]))
-        if (!is.null(x[[1]]$subject)){
+        if (ncol(x[[1]]$xcoef) > 1){
             subj <- gl(length(opt[[1]]), 1, length(roots), labels = levels(x[[1]]$subject))
             f <- unlist(opt) ~ roots | subj
         }

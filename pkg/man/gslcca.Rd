@@ -12,7 +12,8 @@
 gslcca(Y, formula = "Double Exponential", time, subject = NULL, global = FALSE,
     treatment = NULL, ref = 1, separate = FALSE, partial = ~1, data = NULL, 
     subset = NULL, global.smooth = FALSE, subject.smooth = TRUE, 
-    pct.explained = 0.96, start = NULL, ...)
+    pct.explained = 0.96, start = NULL, method = "L-BFGS-B", lower = 2,
+    upper = 15, ...)
 }
 \arguments{
   \item{Y}{ a data matrix. }
@@ -58,6 +59,9 @@ gslcca(Y, formula = "Double Exponential", time, subject = NULL, global = FALSE,
     level. May be \code{NULL} when \code{formula} is a character string,
     however it is recommended that starting values are always
     provided.}
+  \item{method}{ the method to be used by \code{optim} in finding the nonlinear 
+    parameters. }
+  \item{lower, upper}{ bounds on the nonlinear parameters. }
   \item{...}{ arguments passed on to \code{optim}.}
 }
 \details{

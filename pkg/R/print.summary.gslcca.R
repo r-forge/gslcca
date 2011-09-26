@@ -22,8 +22,10 @@ print.summary.gslcca <- function(x, digits = max(3, getOption("digits") - 3), ..
     print(format(x$cor, digits = digits), quote = FALSE)
 
     if (any(x$opt.conv)) {
-        not.conv  <- names(x$opt.conv)[which(x$opt.conv)]
-         cat("\nThe algorithm did not converge in", x$opt.iter,
+        not.conv  <- names(x$opt.conv)[as.logical(x$opt.conv)]
+         cat("\nThe algorithm did not converge",
              "for the following subjects:\n", not.conv)
+         cat("\nThe maximum number of iterations was ", max(x$opt.iter), ".\n",
+             sep = "")
     }
 }
