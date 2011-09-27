@@ -112,7 +112,7 @@ gslcca <- function (Y, # matrix of power spectra
         ## Set number of roots to satisfy pct.explained
         subject.smooth <- max(r)+1
     }
-    else subject.smooth <- ncol(Y)
+    else if(!is.numeric(subject.smooth)) subject.smooth <- ncol(Y)
     cum.pct.explained <- cum.pct.explained[subject.smooth,]
 
     reps <- ifelse(separate, ntrt, 1)
@@ -245,7 +245,7 @@ gslcca <- function (Y, # matrix of power spectra
         ycoef[,i]= V %*% backsolve((qy$qr)[1L:dy, 1L:dy, drop = FALSE],
                                    z$v)[,CCA.roots]
         B= backsolve((qx$qr)[1L:dx, 1L:dx, drop = FALSE], z$u)[,CCA.roots]
-        RFrB=RFr%*%B
+        RFrB=as.matrix(RFr)%*%B
         yscores[ind[[i]]] = as.matrix(y.list[[i]])%*%ycoef[,i]
         cor[i] <- lm.fit(RFrB, yscores[ind[[i]]])$coef
         f.min[i]=Re(opt[[i]]$value)
