@@ -228,7 +228,8 @@ gslcca <- function (Y, # matrix of power spectra
             log(1-(z$d[1])^2)
         }
         ## Minimize ln(1-largesteigenvalue(Cor))
-        opt[[i]] <- suppressWarnings(optim(unlist(start), obj.f, ...))
+        opt[[i]] <- suppressWarnings(optim(unlist(start), obj.f, method = method,
+                                           lower = lower, upper = upper, ...))
         nonlin.par[,i]=opt[[i]]$par
         par <- split(nonlin.par[,i], group)
         dat[nm] <- lapply(par, "[", id)

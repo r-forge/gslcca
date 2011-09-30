@@ -176,7 +176,7 @@ In this example the matrix of power spectra has been specified as the multivaria
 response and the model is specified as \Rcode{"Double Exponential"} which refers to the
 two compartment model:  
 \begin{equation*}
-\exp(-k_1 t) + \exp(-k_2 t).
+\exp(-k_1 t) - \exp(-k_2 t).
 \end{equation*}
 This is equivalent to specifying the model via the symbolic formula
 \begin{verbatim}
@@ -368,7 +368,7 @@ The first option is \Rcode{formula = "Double
 \end{equation*}
 This is equivalent to specifying
 \begin{verbatim}
-formula = ~ exp(-K1 * time) + exp(-K2 * time)
+formula = ~ exp(-K1 * time) - exp(-K2 * time)
 \end{verbatim}
 where \Rcode{time} is the variable specified via the \Rfunarg{time} argument and
 \Robject{K1} and \Robject{K2} are parameters. In this case the parameters are

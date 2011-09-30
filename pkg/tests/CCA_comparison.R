@@ -37,7 +37,7 @@ all.equal(sum((Y %*% A)^2), 1)
 all.equal(sum((X %*% B)^2), 1)
 
 ## check relation between "correlation" and optimised value
-opt <- 1- exp(result$opt[[1]]$value)
+opt <- 1- exp(result$opt[[1]]$value) # opt = log(1 - RSS)
 all.equal(result$cor, sqrt(opt))
 all.equal(result$cor, lm(Y%*%A ~ 0 + X %*% B)$coef, check.attributes = FALSE)
 

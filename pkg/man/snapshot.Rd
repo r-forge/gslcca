@@ -1,5 +1,6 @@
 \name{snapshot}
 \alias{snapshot}
+\alias{plot.snapshot}
 \title{
 Perform Snapshot Analysis Comparing Two Sets of Signatures from GSLCCA
 }
@@ -65,23 +66,50 @@ Heather Turner
 \code{\link{gslcca}}, \code{\link{plot.gslcca}}
 }
 \examples{
-## For illustration compare signatures compare
 data(clonidine)
 
-### Fit separate Double Exponential models for each rate,
-### with amplitude varying by treatment
+### Arbitrarily split the rats into two groups of four
+### - expect results to be roughly the same!
+grp1 <- subset(clonidine, Rat < 39)
+grp2 <- subset(clonidine, Rat >= 39)
+
+## fit same model to each group
 result <- gslcca(spectra, "Double Exponential",
     time = Time, subject = Rat, treatment = Treatment, 
-    subject.smooth = TRUE, pct.explained = 0.96, 
-    data = clonidine, subset = Rat < 39)
-
+    subject.smooth = TRUE, pct.explained = 0.96, data = grp1)
 
 result2 <- gslcca(spectra, "Double Exponential",
     time = Time, subject = Rat, treatment = Treatment, 
-    subject.smooth = TRUE, pct.explained = 0.96, 
-    data = clonidine, subset = Rat >= 39)
-    
-snapshot(signatures(result), signatures(result2))
+    subject.smooth = TRUE, pct.explained = 0.96, data = grp2)
+
+## run snapshot analysis and plot 
+## - observed differences far from significant as expected
+snap <- snapshot(signatures(result), signatures(result2))
+par(mfrow = c(2,2))
+plot(snap, type = c("signatures", "means", "pvalue"), 
+     names = c("Group 1", "Group 2"))
+
+### Artificially create a difference by swapping the data
+### from the delta and theta bands for Group 1
+grp1$spectra <- grp1$spectra[, c(5:8, 1:4, 9:36)]
+colnames(grp1$spectra) <- colnames(grp2$spectra)
+
+## refit model for group 1 and re-run snapshot analysis
+result <- gslcca(spectra, "Double Exponential",
+    time = Time, subject = Rat, treatment = Treatment, 
+    subject.smooth = TRUE, pct.explained = 0.96, data = grp1)    
+snap <- snapshot(signatures(result), signatures(result2))
+
+## now shows highly significant difference in delta,
+## significant difference in theta
+## (Group 1 signatures less consistent here)
+par(mfrow = c(2,2))
+plot(snap, type = c("signatures", "means", "pvalue"), 
+     names = c("Group 1", "Group 2"))
+
+## compact display
+par(mfrow = c(1,1))
+plot(snap, type = "compact", names = c("Group 1", "Group 2"))    
 
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
